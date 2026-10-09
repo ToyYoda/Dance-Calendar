@@ -63,6 +63,12 @@ AI_BASE_URL=http://localhost:11434/v1
 AI_MODEL=llama3.2-vision
 ```
 
+Prüfen, ob alles passt (zeigt `.env`, Modus, Ollama-Verbindung und liest optional einen Flyer aus):
+
+```bash
+.venv/bin/python -m app.check pfad/zum/flyer.jpg      # Windows: .venv\Scripts\python -m app.check C:\pfad\flyer.jpg
+```
+
 Das `openai`-Paket wird nur als Client für die OpenAI-kompatible Schnittstelle genutzt; die Flyer verlassen den Server nicht. Mit `AI_BASE_URL=https://api.openai.com/v1` und einem API-Key ginge auch die OpenAI-Cloud.
 
 ## WhatsApp anbinden
