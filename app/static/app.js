@@ -158,6 +158,32 @@
     });
   }
 
+  // --- Start from a flyer: auto-submit on selection, show progress -----------------------------
+  const scan = $("form[data-scan]");
+  if (scan) {
+    const input = $("[data-scan-input]", scan);
+    const drop = input.closest(".scan-drop");
+    const label = $(".scan-drop-text", scan);
+    const status = $("[data-scan-status]", scan);
+    const button = $("[data-scan-button]", scan);
+    ["dragenter", "dragover"].forEach((t) => drop.addEventListener(t, () => drop.classList.add("dragover")));
+    ["dragleave", "drop"].forEach((t) => drop.addEventListener(t, () => drop.classList.remove("dragover")));
+    input.addEventListener("change", () => {
+      if (!input.files.length) return;
+      label.textContent = input.files[0].name;
+      scan.requestSubmit();
+    });
+    scan.addEventListener("submit", (ev) => {
+      if (!input.files.length) { ev.preventDefault(); input.click(); return; }
+      scan.classList.add("busy");
+      button.disabled = true;
+      label.textContent = "Flyer wird gelesen …";
+      status.textContent = "Das lokale Modell braucht je nach Rechner 10 bis 60 Sekunden.";
+    });
+    // coming back via the browser's back button must not leave the form stuck
+    window.addEventListener("pageshow", () => { scan.classList.remove("busy"); button.disabled = false; });
+  }
+
   // --- Gallery batch actions (DC-33) ----------------------------------------------------------
   const batch = $("#batch-form");
   if (batch) {

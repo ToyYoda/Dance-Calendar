@@ -1,16 +1,19 @@
 """Organizer self-service (DC-20), ownership (DC-21, DC-43) and edit locks (DC-34)."""
 
+import json
+
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Request
 from starlette.datastructures import UploadFile
+from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from app import images
+from app import ai, images
 from app.db import get_db
 from app.forms import apply_values, form_values, parse_event_form
-from app.ingestion import locate_event, run_detached
-from app.models import Event, EventSource, EventStatus, Media, MediaStatus, User
+from app.ingestion import complete_address, locate_event, run_detached
+from app.models import EXTRACTED_FIELDS, Event, EventSource, EventStatus, Media, MediaStatus, User
 from app.security import Forbidden, acquire_lock, can_edit, is_admin_session, release_lock, require_user
-from app.services import cancel, make_organizer, touch
+from app.services import cancel, get_threshold, local_now, make_organizer, touch
 from app.web import redirect, render
 
 router = APIRouter()
@@ -41,6 +44,76 @@ def new_event(request: Request, user: User = Depends(require_user)):
     return render(request, "event_form.html", event=None, values=form_values(None), errors={})
 
 
+def _scan_context(db: Session, media: Media | None, conf: dict, auto: list | None = None, **extra) -> dict:
+    """Template context for a form prefilled from a flyer: preview, confidences, low fields."""
+    threshold = get_threshold(db, "field_threshold")
+    return dict(
+        scan_media=media,
+        conf=conf,
+        low=[f for f, score in conf.items() if score < threshold],
+        auto=auto or [],
+        conf_json=json.dumps(conf),
+        threshold=threshold,
+        **extra,
+    )
+
+
+@router.post("/events/new/scan")
+async def scan_flyer(request: Request, db: Session = Depends(get_db), user: User = Depends(require_user)):
+    """Read an uploaded flyer with the vision model and return the event form prefilled."""
+    form = await request.form()
+    media, error = await _store_flyer(form)
+    if media is None:
+        return render(request, "event_form.html", event=None, values=form_values(None), status_code=400,
+                      errors={"scan": error or "Bitte wähle ein Bild aus."})
+    media.sender_phone = user.phone  # only the uploader may attach this flyer to an event
+    db.add(media)
+    db.commit()
+
+    values = form_values(None)
+    conf: dict = {}
+    auto: list = []
+    scan_error = None
+    try:
+        extraction = ai.extract(media.original_path, today=local_now().date())
+        values.update(extraction.values)
+        conf = dict(extraction.confidence)
+        # Fill a missing street / postcode from the venue name, like the WhatsApp pipeline does
+        probe = Event(**{k: values.get(k) for k in ("location_name", "address", "postcode", "city")})
+        complete_address(probe, conf, 1.0)
+        for name in probe.auto_filled or []:
+            values[name] = getattr(probe, name)
+        auto = list(probe.auto_filled or [])
+    except ai.AIError as exc:
+        scan_error = str(exc)
+    return render(request, "event_form.html", event=None, values=values, errors={},
+                  **_scan_context(db, media, conf, auto, scan_error=scan_error))
+
+
+def _claim_media(db: Session, user: User, raw_id) -> Media | None:
+    """A flyer uploaded via /events/new/scan, if it belongs to this user and is not used yet."""
+    try:
+        media = db.get(Media, int(raw_id))
+    except (TypeError, ValueError):
+        return None
+    if media is None or media.source != EventSource.FORM or media.sender_phone != user.phone:
+        return None
+    if db.scalar(select(Event.id).where(Event.media_id == media.id)) is not None:
+        return None
+    return media
+
+
+def _parse_conf(raw: str | None) -> dict:
+    try:
+        data = json.loads(raw or "{}")
+    except ValueError:
+        return {}
+    if not isinstance(data, dict):
+        return {}
+    return {k: max(0.0, min(1.0, float(v))) for k, v in data.items()
+            if k in EXTRACTED_FIELDS and isinstance(v, (int, float))}
+
+
 @router.post("/events/new")
 async def create_event(request: Request, background: BackgroundTasks, db: Session = Depends(get_db),
                        user: User = Depends(require_user)):
@@ -50,10 +123,13 @@ async def create_event(request: Request, background: BackgroundTasks, db: Sessio
     media, flyer_error = await _store_flyer(form)
     if flyer_error:
         errors["flyer"] = flyer_error
+    scanned = None if media else _claim_media(db, user, form.get("media_id"))
+    conf = _parse_conf(form.get("ai_confidence")) if scanned else {}
     if errors:
         if media:
             images.delete_image(media.original_path)
-        return render(request, "event_form.html", event=None, values=values, errors=errors, status_code=400)
+        return render(request, "event_form.html", event=None, values=values, errors=errors, status_code=400,
+                      **(_scan_context(db, scanned, conf) if scanned else {}))
 
     event = Event(owner_id=user.id, source=EventSource.FORM, submitter_phone=user.phone,
                   status=EventStatus.LIVE if submit else EventStatus.DRAFT)
@@ -62,6 +138,11 @@ async def create_event(request: Request, background: BackgroundTasks, db: Sessio
         db.add(media)
         db.flush()
         event.media_id = media.id
+    elif scanned:
+        event.media_id = scanned.id
+        event.field_confidence = conf
+        # the organizer has seen and confirmed every prefilled field
+        event.verified_fields = sorted(conf)
     db.add(event)
     make_organizer(user)
     db.commit()

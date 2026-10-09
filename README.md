@@ -17,6 +17,7 @@ Die zusammengeführten User Stories und alle Designentscheidungen stehen in [`do
 - Hell- und Dunkelmodus, mobil optimiert
 
 **Für Veranstalter:innen**
+- **Mit Flyer starten:** Flyer auf „Event eintragen“ hochladen, das Modell füllt das Formular vor (unsichere Felder markiert, fehlende Adresse über OpenStreetMap ergänzt), prüfen, veröffentlichen
 - Formular mit Live-Validierung, Flyer-Upload, Entwurf / Veröffentlichen, Bearbeiten, Absagen, Löschen
 - Flyer einfach per WhatsApp schicken; Absagen per Textnachricht („… fällt aus“)
 - „Nicht mein Event“ gibt per Bot angelegte Events an die Admins ab

@@ -393,3 +393,20 @@ input[type="file"] { border: 0; padding-left: 0; }
 .zoom { position: fixed; inset: 0; z-index: 50; background: rgba(0, 0, 0, .94); overflow: auto; touch-action: pinch-zoom pan-x pan-y; }
 .zoom img { display: block; width: 100%; max-width: none; }
 .zoom-close { position: fixed; top: 12px; right: 12px; z-index: 51; background: var(--bg); }
+
+/* --- Start from a flyer --- */
+.form-card-wide { max-width: none; }
+.scan h2 { margin-top: .4rem; }
+.scan-drop {
+  position: relative; display: grid; place-items: center; min-height: 150px; margin-top: 12px;
+  border: 1px dashed var(--line-strong); color: var(--muted); text-align: center; padding: 20px;
+  transition: border-color .15s, color .15s;
+}
+.scan-drop:hover, .scan-drop.dragover { border-color: var(--accent); color: var(--text); }
+.scan-drop.has-error { border-color: var(--danger); }
+.scan-drop input { position: absolute; inset: 0; opacity: 0; cursor: pointer; min-height: 0; }
+.scan-drop-text { font-family: var(--display); font-style: italic; font-size: 1.4rem; pointer-events: none; }
+.scan.busy .scan-drop { border-style: solid; border-color: var(--accent); animation: pulse 1.4s ease-in-out infinite; }
+@keyframes pulse { 50% { opacity: .55; } }
+.divider-text { display: flex; align-items: center; gap: 14px; color: var(--muted); margin: 28px 0 20px; }
+.divider-text::before, .divider-text::after { content: ""; flex: 1; border-top: 1px solid var(--line); }

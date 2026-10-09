@@ -1,11 +1,27 @@
 {% extends "base.html" %}
 {% import "_macros.html" as m %}
 {% block title %}{{ "Event bearbeiten" if event else "Event eintragen" }}{% endblock %}
+{% block main_class %}{% if scan_media %}wide{% endif %}{% endblock %}
 {% block content %}
-<section class="card form-card">
+<section class="card form-card {% if scan_media %}form-card-wide{% endif %}">
   <h1>{{ "Event bearbeiten" if event else "Event eintragen" }}</h1>
-  {% if not event %}
-    <p class="muted">Tipp: Du kannst Flyer auch einfach per WhatsApp an unseren Bot schicken.</p>
+
+  {% if not event and not scan_media %}
+    <form method="post" action="/events/new/scan" enctype="multipart/form-data" class="scan" data-scan>
+      <h2>Mit Flyer starten</h2>
+      <p class="muted">Lade den Flyer hoch, wir lesen Titel, Datum, Ort und Preis aus und füllen das Formular für dich vor.
+        Du prüfst nur noch und veröffentlichst.</p>
+      <label class="scan-drop {% if errors.get('scan') %}has-error{% endif %}">
+        <input type="file" name="flyer" accept="image/*" required data-scan-input>
+        <span class="scan-drop-text">Flyer auswählen oder hierher ziehen</span>
+      </label>
+      {{ m.field_error(errors, 'scan') }}
+      <div class="actions">
+        <button class="btn btn-primary" data-scan-button>Flyer auslesen</button>
+        <span class="muted small scan-status" data-scan-status aria-live="polite"></span>
+      </div>
+    </form>
+    <p class="divider-text"><span>oder von Hand ausfüllen</span></p>
   {% endif %}
 
   {% if event and event.status == "ADMIN_REVIEW" and not is_admin %}
@@ -18,28 +34,62 @@
   {% endif %}
   {% if errors.get('_form') %}<div class="notice notice-warn" role="alert">{{ errors['_form'] }}</div>{% endif %}
 
-  <form method="post" enctype="multipart/form-data" class="event-form" novalidate
-        action="{{ '/events/%d/edit'|format(event.id) if event else '/events/new' }}"
-        {% if event %}data-unlock="/events/{{ event.id }}/unlock"{% endif %}>
-    {% if event %}<input type="hidden" name="sequence" value="{{ event.sequence }}">{% endif %}
+  {% if scan_media %}
+    {% if scan_error %}
+      <div class="notice notice-warn" role="alert">Der Flyer konnte nicht automatisch ausgelesen werden. Bitte fülle die Felder selbst aus.
+        Der Flyer wird trotzdem an das Event gehängt.<br><span class="small muted">{{ scan_error }}</span></div>
+    {% elif conf %}
+      <div class="notice">Aus dem Flyer ausgelesen. Bitte prüfe alles kurz.
+        {% if low %}Gelb markierte Felder sind unsicher (unter {{ (threshold * 100)|round|int }} %).{% endif %}
+        Leere Felder standen nicht auf dem Flyer.</div>
+    {% else %}
+      <div class="notice notice-warn">Auf dem Flyer wurden keine Event-Daten gefunden. Bitte fülle die Felder selbst aus.</div>
+    {% endif %}
+  {% endif %}
 
-    {% include "_event_fields.html" %}
+  <div class="{% if scan_media %}review-grid{% endif %}">
+    {% if scan_media %}
+      <aside class="review-flyer">
+        <a href="{{ media_url(scan_media.original_path, 'original') }}" target="_blank" rel="noopener" title="In voller Größe öffnen">
+          <img src="{{ media_url(scan_media.original_path, 'preview') }}" alt="Hochgeladener Flyer">
+        </a>
+        <p class="small"><a href="/events/new">Anderen Flyer verwenden</a></p>
+      </aside>
+    {% endif %}
 
-    <label class="field {% if errors.get('flyer') %}has-error{% endif %}">
-      <span>Flyer {% if event and event.media %}(ersetzt den aktuellen){% endif %}</span>
-      <input type="file" name="flyer" accept="image/*">
-      {{ m.field_error(errors, 'flyer') }}
-    </label>
-
-    <div class="actions sticky-actions">
-      {% if not event or event.status == "DRAFT" %}
-        <button class="btn btn-primary" name="action" value="submit" {% if locked %}disabled{% endif %}>Veröffentlichen</button>
-        <button class="btn btn-secondary" name="action" value="draft" data-skip-validation {% if locked %}disabled{% endif %}>Als Entwurf speichern</button>
-      {% else %}
-        <button class="btn btn-primary" name="action" value="save" {% if locked %}disabled{% endif %}>Speichern</button>
+    <form method="post" enctype="multipart/form-data" class="event-form" novalidate
+          action="{{ '/events/%d/edit'|format(event.id) if event else '/events/new' }}"
+          {% if event %}data-unlock="/events/{{ event.id }}/unlock"{% endif %}>
+      {% if event %}<input type="hidden" name="sequence" value="{{ event.sequence }}">{% endif %}
+      {% if scan_media %}
+        <input type="hidden" name="media_id" value="{{ scan_media.id }}">
+        <input type="hidden" name="ai_confidence" value="{{ conf_json }}">
       {% endif %}
-      <a class="btn btn-ghost" href="{{ '/events/%d'|format(event.id) if event else '/' }}">Abbrechen</a>
-    </div>
-  </form>
+
+      {% include "_event_fields.html" %}
+
+      {% if not scan_media %}
+        <label class="field {% if errors.get('flyer') %}has-error{% endif %}">
+          <span>Flyer {% if event and event.media %}(ersetzt den aktuellen){% endif %}</span>
+          <input type="file" name="flyer" accept="image/*">
+          {{ m.field_error(errors, 'flyer') }}
+        </label>
+      {% endif %}
+
+      <div class="actions sticky-actions">
+        {% if not event or event.status == "DRAFT" %}
+          <button class="btn btn-primary" name="action" value="submit" {% if locked %}disabled{% endif %}>Veröffentlichen</button>
+          <button class="btn btn-secondary" name="action" value="draft" data-skip-validation {% if locked %}disabled{% endif %}>Als Entwurf speichern</button>
+        {% else %}
+          <button class="btn btn-primary" name="action" value="save" {% if locked %}disabled{% endif %}>Speichern</button>
+        {% endif %}
+        <a class="btn btn-ghost" href="{{ '/events/%d'|format(event.id) if event else '/' }}">Abbrechen</a>
+      </div>
+    </form>
+  </div>
+
+  {% if not event and not scan_media %}
+    <p class="muted small">Tipp: Flyer kannst du auch einfach per WhatsApp an unseren Bot schicken.</p>
+  {% endif %}
 </section>
 {% endblock %}
