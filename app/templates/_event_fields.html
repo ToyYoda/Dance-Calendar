@@ -7,8 +7,8 @@
 {% set verified = verified or [] %}
 
 {% macro hint(name) -%}
-  {% if name in verified %}<span class="hint hint-ok" title="Manuell geprüft">✓ geprüft</span>
-  {% elif name in low %}<span class="hint hint-low" title="Die KI ist unsicher">⚠ {{ (conf[name] * 100)|round|int }} %</span>
+  {% if name in verified %}<span class="hint hint-ok" title="Manuell geprüft">geprüft</span>
+  {% elif name in low %}<span class="hint hint-low" title="Die KI ist unsicher">unsicher, {{ (conf[name] * 100)|round|int }} %</span>
   {% elif name in conf %}<span class="hint">{{ (conf[name] * 100)|round|int }} %</span>{% endif %}
   {% if name in auto %}<span class="hint hint-auto" title="Automatisch aus OpenStreetMap ergänzt">auto ergänzt</span>{% endif %}
 {%- endmacro %}

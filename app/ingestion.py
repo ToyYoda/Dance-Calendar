@@ -46,7 +46,7 @@ def receive_image(db: Session, data: bytes, sender_phone: str) -> Media:
     db.add(media)
     get_or_create_user(db, sender_phone)
     db.commit()
-    send_message(db, sender_phone, "📥 Danke! Dein Bild ist angekommen und wird gerade geprüft.")
+    send_message(db, sender_phone, "Danke! Dein Bild ist angekommen und wird gerade geprüft.")
     return media
 
 
@@ -110,7 +110,7 @@ def create_event_from_media(db: Session, media: Media, classifier_score: float =
             send_message(
                 db,
                 event.submitter_phone,
-                "🔎 Wir haben deinen Flyer erkannt. Ein Admin prüft die Daten kurz, dann erscheint das Event im Kalender.",
+                "Wir haben deinen Flyer erkannt. Ein Admin prüft die Daten kurz, dann erscheint das Event im Kalender.",
             )
     if owner and event.submitter_phone:
         send_message(
@@ -213,7 +213,7 @@ def handle_text(db: Session, phone: str, text: str) -> str:
 
     if match is not None:
         cancel(db, match)
-        reply = f"🛑 „{match.title}“ am {match.start:%d.%m.} ist jetzt als ABGESAGT markiert. {event_url(match)}"
+        reply = f"„{match.title}“ am {match.start:%d.%m.} ist jetzt als ABGESAGT markiert. {event_url(match)}"
     else:
         db.add(
             CancellationRequest(

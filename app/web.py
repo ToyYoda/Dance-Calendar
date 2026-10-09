@@ -110,6 +110,7 @@ templates.env.globals.update(
     STYLE_CLASSES=STYLE_CLASSES,
     MONTHS=MONTHS,
     WEEKDAYS=WEEKDAYS,
+    WEEKDAYS_LONG=WEEKDAYS_LONG,
     media_url=media_url,
     static_map_url=static_map_url,
     route_url=route_url,

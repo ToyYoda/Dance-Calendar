@@ -4,7 +4,7 @@
 {% block content %}
 <article class="event-detail {% if event.is_cancelled %}is-cancelled{% endif %}">
   {% if event.is_cancelled %}
-    <div class="cancel-banner" role="alert">ABGESAGT – dieses Event findet nicht statt.</div>
+    <div class="cancel-banner" role="alert"><strong>ABGESAGT</strong> Dieses Event findet nicht statt.</div>
   {% endif %}
   {% if event.status not in ("LIVE", "CANCELLED") %}
     <div class="notice">Status: {{ m.status_badge(event.status) }}
@@ -15,10 +15,7 @@
 
   <div class="detail-grid">
     <div class="detail-main">
-      <div class="tags">{{ m.style_badges(event.dance_styles) }}
-        {% if event.event_type %}<span class="badge badge-plain">{{ event.event_type }}</span>{% endif %}
-        {% if event.level %}<span class="badge badge-plain">{{ event.level }}</span>{% endif %}
-      </div>
+      <p class="kicker">{{ ([event.dance_styles|join(" / ")] + [event.event_type, event.level])|select|join(" — ") }}</p>
       <h1 class="title-text">{{ event.title }}</h1>
 
       <dl class="facts">
@@ -34,7 +31,7 @@
             <form method="post" action="/events/{{ event.id }}/attend" class="attend" data-event="{{ event.id }}">
               <input type="hidden" name="attend" value="{{ '0' if attending else '1' }}">
               <button class="btn {{ 'btn-secondary' if attending else 'btn-primary' }} attend-btn" aria-pressed="{{ 'true' if attending else 'false' }}">
-                {{ "✓ Ich bin dabei" if attending else "Bin dabei" }}
+                {{ "Du bist dabei" if attending else "Bin dabei" }}
               </button>
             </form>
           {% else %}

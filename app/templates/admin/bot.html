@@ -37,7 +37,7 @@
           <td class="nowrap">{{ msg.created_at.strftime("%d.%m. %H:%M:%S") }}</td>
           <td class="nowrap">{{ msg.to_phone|phone }}</td>
           <td class="pre">{{ msg.body }}</td>
-          <td>{{ "✓" if msg.ok else "✕ " ~ (msg.error or "") }}</td>
+          <td>{{ "ok" if msg.ok else "Fehler: " ~ (msg.error or "") }}</td>
         </tr>
       {% else %}
         <tr><td colspan="4" class="muted">Noch keine Nachrichten.</td></tr>

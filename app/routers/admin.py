@@ -433,7 +433,7 @@ def resolve_cancellation(req_id: int, event_id: str = Form(""), db: Session = De
         event = db.get(Event, int(event_id))
         if event is not None:
             cancel(db, event)
-            send_message(db, req.sender_phone, f"🛑 „{event.title}“ ist jetzt als ABGESAGT markiert. {event_url(event)}")
+            send_message(db, req.sender_phone, f"„{event.title}“ ist jetzt als ABGESAGT markiert. {event_url(event)}")
             return redirect("/admin/cancellations", flash=f"„{event.title}“ abgesagt.")
     return redirect("/admin/cancellations", flash="Anfrage verworfen.")
 

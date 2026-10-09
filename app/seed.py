@@ -4,7 +4,7 @@ import io
 import random
 from datetime import timedelta
 
-from PIL import Image, ImageDraw, ImageFilter, ImageFont
+from PIL import Image, ImageDraw, ImageFont
 
 from app import images
 from app.db import SessionLocal, init_db
@@ -28,21 +28,32 @@ EVENTS = [
     ("Bachata Moonlight Social", ["Bachata"], "Social", "Open", "frei"),
     ("Kizomba Marathon", ["Kizomba"], "Festival", "Open", "45 €"),
 ]
-# Accent glow per flyer: wine, plum, smoky gold, midnight teal, ember
-COLORS = [(150, 18, 52), (96, 36, 120), (160, 120, 50), (24, 84, 90), (170, 60, 30)]
-GOLD = (201, 164, 92)
+# Poster palettes (background, title, accent): ink black, oxblood, paper
+COLORS = [
+    ((16, 14, 13), (235, 229, 218), (192, 57, 43)),
+    ((150, 34, 26), (16, 14, 13), (235, 229, 218)),
+    ((232, 225, 211), (20, 18, 16), (163, 34, 26)),
+    ((16, 14, 13), (192, 57, 43), (235, 229, 218)),
+    ((40, 36, 33), (235, 229, 218), (192, 57, 43)),
+]
 SERIF_FONTS = [
     "/usr/share/fonts/truetype/dejavu/DejaVuSerif.ttf",
-    "/usr/share/fonts/truetype/liberation/LiberationSerif-Italic.ttf",
+    "/usr/share/fonts/truetype/liberation/LiberationSerif-Regular.ttf",
     "/usr/share/fonts/truetype/freefont/FreeSerif.ttf",
-    "/Library/Fonts/Georgia.ttf",
+    "/Library/Fonts/Didot.ttc",
+    "C:/Windows/Fonts/BOD_R.TTF",
     "C:/Windows/Fonts/georgia.ttf",
+]
+SANS_FONTS = [
+    "/usr/share/fonts/truetype/liberation/LiberationSans-Regular.ttf",
+    "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf",
+    "/Library/Fonts/Arial.ttf",
+    "C:/Windows/Fonts/arial.ttf",
 ]
 
 
-def _font(size: int, italic: bool = False):
-    paths = SERIF_FONTS[1:2] + SERIF_FONTS if italic else SERIF_FONTS
-    for path in paths:
+def _font(size: int, sans: bool = False):
+    for path in SANS_FONTS if sans else SERIF_FONTS:
         try:
             return ImageFont.truetype(path, size)
         except OSError:
@@ -53,31 +64,34 @@ def _font(size: int, italic: bool = False):
         return ImageFont.load_default()
 
 
-def make_flyer(title: str, when: str, where: str, color) -> bytes:
-    """A dark, candle-lit demo flyer: black base, blurred accent spotlight, thin gold frame, serif type."""
+def make_flyer(title: str, when: str, where: str, palette) -> bytes:
+    """A typographic demo poster: flat colour, big serif title, one accent rule, print grain."""
+    bg, fg, accent = palette
     w, h = 800, 1100
-    img = Image.new("RGB", (w, h), (10, 7, 9))
-    glow = Image.new("RGB", (w, h), (10, 7, 9))
-    gd = ImageDraw.Draw(glow)
-    rnd = random.Random(title)
-    cx, cy = rnd.randint(250, 550), rnd.randint(250, 420)
-    gd.ellipse([cx - 360, cy - 300, cx + 360, cy + 300], fill=color)
-    gd.ellipse([w - 260, h - 300, w + 120, h + 80], fill=tuple(c // 2 for c in color))
-    img = Image.blend(img, glow.filter(ImageFilter.GaussianBlur(140)), 0.9)
+    img = Image.new("RGB", (w, h), bg)
     draw = ImageDraw.Draw(img)
-    # a thin gold ring as a spotlight / moon motif
-    draw.ellipse([cx - 150, cy - 150, cx + 150, cy + 150], outline=tuple(c * 2 // 3 for c in GOLD), width=1)
-    draw.rectangle([28, 28, w - 28, h - 28], outline=GOLD, width=2)
-    draw.rectangle([40, 40, w - 40, h - 40], outline=tuple(c // 2 for c in GOLD), width=1)
-    small, mid = _font(30), _font(34, italic=True)
-    draw.text((w // 2, 110), "—  NIGHT  OF  DANCE  —", fill=GOLD, font=small, anchor="mm")
-    y = 620
-    for line in _wrap(title.upper(), 15):
-        draw.text((w // 2, y), line, fill=(240, 228, 214), font=_font(60), anchor="mm")
-        y += 76
-    draw.line([w // 2 - 80, y, w // 2 + 80, y], fill=GOLD, width=1)
-    draw.text((w // 2, y + 50), when, fill=GOLD, font=mid, anchor="mm")
-    draw.text((w // 2, y + 100), where, fill=(200, 188, 176), font=small, anchor="mm")
+    rnd = random.Random(title)
+    margin = 64
+    # accent bar along the left edge, length varies per poster
+    bar_top = rnd.randint(80, 260)
+    draw.rectangle([margin, bar_top, margin + 10, bar_top + rnd.randint(260, 480)], fill=accent)
+    # huge stacked title
+    size = 118 if len(title) < 22 else 96
+    lines = _wrap(title, 11 if size > 100 else 13)
+    max_width = w - 2 * margin - 44
+    while size > 48 and max(draw.textlength(line, font=_font(size)) for line in lines) > max_width:
+        size -= 6
+    y = bar_top
+    for line in lines:
+        draw.text((margin + 44, y), line, fill=fg, font=_font(size))
+        y += int(size * 1.02)
+    # footer: date and venue, small sans, separated by a hairline
+    draw.line([margin, h - 190, w - margin, h - 190], fill=accent, width=2)
+    draw.text((margin, h - 165), when, fill=fg, font=_font(40, sans=True))
+    draw.text((margin, h - 110), where, fill=accent, font=_font(32, sans=True))
+    # print grain
+    noise = Image.effect_noise((w, h), 40).convert("RGB")
+    img = Image.blend(img, noise, 0.06)
     buf = io.BytesIO()
     img.save(buf, "JPEG", quality=88)
     return buf.getvalue()

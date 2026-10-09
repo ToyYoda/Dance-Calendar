@@ -28,7 +28,7 @@
 {% endif %}
 
 <details class="filters card" {% if filters.active %}open{% endif %}>
-  <summary>Filter &amp; Suche{% if filters.active %} <span class="badge badge-plain">aktiv</span>{% endif %}</summary>
+  <summary>Filter &amp; Suche{% if filters.active %} <em class="active-mark">– aktiv</em>{% endif %}</summary>
   <form method="get" action="/" class="filter-form" id="filter-form">
     <input type="hidden" name="view" value="{{ view }}">
     <label class="field grow">
@@ -124,7 +124,7 @@
   </section>
   {% if selected_day %}
   <section id="day" class="day-list">
-    <h2>{{ selected_day|date(long=true) }}</h2>
+    <h2 class="list-day"><span class="list-day-num">{{ selected_day.day }}</span><span class="list-day-label">{{ WEEKDAYS_LONG[selected_day.weekday()] }}<br>{{ MONTHS[selected_day.month - 1] }} {{ selected_day.year }}</span></h2>
     {% for ev in day_events %}{{ m.event_row(ev) }}{% else %}<p class="muted">Keine Events an diesem Tag.</p>{% endfor %}
   </section>
   {% endif %}
@@ -155,7 +155,7 @@
 {% elif view == "list" %}
   <section class="list-view">
     {% for day, evs in grouped %}
-      <h2 class="list-day">{{ day|date(long=true) }}</h2>
+      <h2 class="list-day"><span class="list-day-num">{{ day.day }}</span><span class="list-day-label">{{ WEEKDAYS_LONG[day.weekday()] }}<br>{{ MONTHS[day.month - 1] }} {{ day.year }}</span></h2>
       {% for ev in evs %}{{ m.event_row(ev) }}{% endfor %}
     {% else %}
       <div class="card center"><p class="muted">Keine kommenden Events für diese Auswahl.</p></div>

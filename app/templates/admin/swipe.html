@@ -5,19 +5,19 @@
 {% include "admin/_nav.html" %}
 <section class="swipe" id="swipe" aria-live="polite">
   <div class="swipe-stage" id="swipe-stage">
-    <p class="muted center" id="swipe-empty" hidden>Keine Events in der Prüfliste. 🎉</p>
+    <p class="muted center" id="swipe-empty" hidden>Keine Events in der Prüfliste.</p>
   </div>
   <p class="swipe-msg" id="swipe-msg" role="status"></p>
   <div class="swipe-buttons">
-    <button type="button" class="btn btn-warn round" id="swipe-reject" aria-label="Ablehnen (nach links wischen)">✕</button>
-    <button type="button" class="btn btn-ghost round" id="swipe-undo" aria-label="Letzte Aktion rückgängig" disabled>↶</button>
-    <button type="button" class="btn btn-primary round" id="swipe-approve" aria-label="Freigeben (nach rechts wischen)">✓</button>
+    <button type="button" class="btn btn-warn" id="swipe-reject" aria-label="Ablehnen (nach links wischen)">← Ablehnen</button>
+    <button type="button" class="btn btn-ghost" id="swipe-undo" aria-label="Letzte Aktion rückgängig" disabled>Zurück</button>
+    <button type="button" class="btn btn-primary" id="swipe-approve" aria-label="Freigeben (nach rechts wischen)">Freigeben →</button>
   </div>
   <p class="muted small center">Rechts wischen = freigeben · links = ablehnen · Flyer antippen = groß anzeigen (Pinch-Zoom) · „Bearbeiten“ öffnet alle Felder.</p>
 </section>
 
 <div class="zoom" id="zoom" hidden>
-  <button type="button" class="icon-btn zoom-close" id="zoom-close" aria-label="Schließen">✕</button>
+  <button type="button" class="btn btn-sm zoom-close" id="zoom-close">Schließen</button>
   <img id="zoom-img" alt="Flyer in voller Größe">
 </div>
 {% endblock %}

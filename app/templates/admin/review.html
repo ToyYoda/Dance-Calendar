@@ -16,7 +16,7 @@
 </div>
 
 {% if locked %}
-  <div class="notice notice-warn" role="alert">🔒 {{ event.locked_by.display_name if event.locked_by else "Ein anderer Admin" }} bearbeitet dieses Event gerade (bis {{ event.locked_until|localtime }} Uhr). Du kannst es ansehen, aber nicht ändern.</div>
+  <div class="notice notice-warn" role="alert">Gesperrt: {{ event.locked_by.display_name if event.locked_by else "Ein anderer Admin" }} bearbeitet dieses Event gerade (bis {{ event.locked_until|localtime }} Uhr). Du kannst es ansehen, aber nicht ändern.</div>
 {% endif %}
 {% if errors.get('_form') %}<div class="notice notice-warn" role="alert">{{ errors['_form'] }}</div>{% endif %}
 

@@ -42,7 +42,7 @@
         <span class="small">${item.styles.map(esc).join(", ")}${item.confidence != null ? ` · Score ${Math.round(item.confidence * 100)} %` : ""}</span>
         ${item.missing.length ? `<span class="small warn-text">Fehlt: ${item.missing.map(esc).join(", ")}</span>` : ""}
         ${item.low.length ? `<span class="small warn-text">Unsicher: ${item.low.map(esc).join(", ")}</span>` : ""}
-        ${item.locked_by ? `<span class="small">🔒 ${esc(item.locked_by)} bearbeitet gerade</span>` : ""}
+        ${item.locked_by ? `<span class="small">Gesperrt: ${esc(item.locked_by)} bearbeitet gerade</span>` : ""}
         <a class="small" href="/admin/events/${item.id}">Bearbeiten</a>
       </div>`;
     if (interactive) attachDrag(el);
@@ -110,7 +110,7 @@
     }
     lastDecision = { id: data.decision_id, title: item.title };
     undoBtn.disabled = false;
-    say(`${action === "approve" ? "✓ Freigegeben" : "✕ Abgelehnt"}: ${item.title}`);
+    say(`${action === "approve" ? "Freigegeben" : "Abgelehnt"}: ${item.title}`);
     queue.shift();
     setTimeout(render, 220);
   }
@@ -126,7 +126,7 @@
     busy = false;
     const data = await res.json().catch(() => ({}));
     if (!res.ok) { say(data.error || "Rückgängig fehlgeschlagen."); return; }
-    say(`↶ Rückgängig: ${lastDecision.title}`);
+    say(`Zurückgenommen: ${lastDecision.title}`);
     lastDecision = null;
     undoBtn.disabled = true;
     await load();

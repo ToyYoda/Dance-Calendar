@@ -37,11 +37,11 @@
     {% for ev in events %}
       <label class="gallery-item">
         <input type="checkbox" name="ids" value="{{ ev.id }}" class="gallery-check">
-        {% if ev.media %}<img src="{{ media_url(ev.media.original_path, 'thumb') }}" alt="" loading="lazy">{% else %}<span class="thumb-empty">✦</span>{% endif %}
+        {% if ev.media %}<img src="{{ media_url(ev.media.original_path, 'thumb') }}" alt="" loading="lazy">{% else %}<span class="thumb-empty">–</span>{% endif %}
         <span class="gallery-caption">
           <strong>{{ ev.title or "(ohne Titel)" }}</strong>
           <span class="small muted">{{ ev.start|date if ev.start else "kein Datum" }} · {{ ev.city or "kein Ort" }}</span>
-          {% if ev.is_locked_for(user.id) %}<span class="small">🔒 {{ ev.locked_by.display_name }}</span>{% endif %}
+          {% if ev.is_locked_for(user.id) %}<span class="small">Gesperrt: {{ ev.locked_by.display_name }}</span>{% endif %}
         </span>
         <a class="small gallery-open" href="/admin/events/{{ ev.id }}">öffnen</a>
       </label>

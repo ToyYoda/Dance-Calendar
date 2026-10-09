@@ -185,7 +185,7 @@ def publish(db: Session, event: Event, admin: User | None = None, auto: bool = F
         db.add(ReviewDecision(event_id=event.id, admin_id=admin.id, action="approve", previous_status=previous))
     db.commit()
     if previous != EventStatus.LIVE and (auto or admin is not None):
-        notify_submitter(db, event, f"✅ Dein Event „{event.title}“ ist jetzt im Kalender: {event_url(event)}")
+        notify_submitter(db, event, f"Dein Event „{event.title}“ ist jetzt im Kalender: {event_url(event)}")
 
 
 def reject(db: Session, event: Event, admin: User, action: str = "reject") -> None:
@@ -195,7 +195,7 @@ def reject(db: Session, event: Event, admin: User, action: str = "reject") -> No
     db.add(ReviewDecision(event_id=event.id, admin_id=admin.id, action=action, previous_status=previous))
     db.commit()
     if action == "reject":
-        notify_submitter(db, event, f"❌ Dein eingereichtes Event „{event.title or 'ohne Titel'}“ wurde nicht veröffentlicht.")
+        notify_submitter(db, event, f"Dein eingereichtes Event „{event.title or 'ohne Titel'}“ wurde nicht veröffentlicht.")
 
 
 def cancel(db: Session, event: Event) -> None:

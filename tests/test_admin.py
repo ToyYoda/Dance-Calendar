@@ -47,7 +47,7 @@ def test_triage_list_shows_low_confidence_fields(admin_client, db):
 def test_review_marks_low_fields_and_records_corrections(admin_client, db):
     ev = _bot_event(db)
     html = admin_client.get(f"/admin/events/{ev.id}").text
-    assert "is-low" in html and "⚠ 60 %" in html
+    assert "is-low" in html and "unsicher, 60 %" in html
     form = event_form(title="Salsa Night", city="Köln", action="approve")
     form["start"] = ev.start.strftime("%Y-%m-%dT%H:%M")
     r = admin_client.post(f"/admin/events/{ev.id}", data=form, follow_redirects=False)

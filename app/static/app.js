@@ -32,7 +32,7 @@
     try {
       await navigator.clipboard.writeText(el.dataset.copy);
       const old = el.textContent;
-      el.textContent = "✓ Kopiert";
+      el.textContent = "Kopiert";
       setTimeout(() => { el.textContent = old; }, 1500);
     } catch (e) {
       prompt("Link kopieren:", el.dataset.copy);
@@ -47,7 +47,7 @@
   function renderAttend(form, attending) {
     form.querySelector("input[name=attend]").value = attending ? "0" : "1";
     const btn = form.querySelector(".attend-btn");
-    btn.textContent = attending ? "✓ Ich bin dabei" : "Bin dabei";
+    btn.textContent = attending ? "Du bist dabei" : "Bin dabei";
     btn.classList.toggle("btn-primary", !attending);
     btn.classList.toggle("btn-secondary", attending);
     btn.setAttribute("aria-pressed", String(attending));
