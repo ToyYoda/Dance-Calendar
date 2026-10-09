@@ -28,7 +28,7 @@
   {% for ev in events %}
     {% set low = low_fields(ev, threshold) %}
     <a class="triage-item card" href="{{ '/admin/events/%d'|format(ev.id) if status == 'ADMIN_REVIEW' else '/events/%d'|format(ev.id) }}">
-      {% if ev.media %}<img src="{{ media_url(ev.media.original_path, 'thumb') }}" alt="" loading="lazy" class="triage-thumb">{% else %}<span class="triage-thumb thumb-empty">♪</span>{% endif %}
+      {% if ev.media %}<img src="{{ media_url(ev.media.original_path, 'thumb') }}" alt="" loading="lazy" class="triage-thumb">{% else %}<span class="triage-thumb thumb-empty">✦</span>{% endif %}
       <div class="triage-data">
         <strong>{{ ev.title or "(ohne Titel)" }}</strong>
         <span class="muted small">{{ ev.start|date if ev.start else "Datum fehlt" }} {{ ev.start|time }} · {{ ev.location_name or "Ort fehlt" }}{% if ev.city %}, {{ ev.city }}{% endif %}</span>

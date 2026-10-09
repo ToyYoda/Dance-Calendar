@@ -45,10 +45,10 @@
       </div>
 
       <div class="actions wrap">
-        <a class="btn btn-secondary" href="/events/{{ event.id }}.ics">📅 In meinen Kalender</a>
-        {% if event.ticket_url %}<a class="btn btn-secondary" href="{{ event.ticket_url }}" rel="noopener nofollow" target="_blank">🎟 Tickets</a>{% endif %}
+        <a class="btn btn-secondary" href="/events/{{ event.id }}.ics">In meinen Kalender</a>
+        {% if event.ticket_url %}<a class="btn btn-secondary" href="{{ event.ticket_url }}" rel="noopener nofollow" target="_blank">Tickets</a>{% endif %}
         {% if event.location_name or event.full_address %}
-          <a class="btn btn-secondary" href="{{ route_url(event) }}" target="_blank" rel="noopener">🧭 Route planen</a>
+          <a class="btn btn-secondary" href="{{ route_url(event) }}" target="_blank" rel="noopener">Route planen</a>
         {% endif %}
       </div>
 

@@ -9,9 +9,8 @@
   if (themeBtn) {
     themeBtn.addEventListener("click", () => {
       const root = document.documentElement;
-      const current = root.dataset.theme ||
-        (matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light");
-      const next = current === "dark" ? "light" : "dark";
+      // Dark is the default look; light is the optional "candle-light" variant
+      const next = root.dataset.theme === "light" ? "dark" : "light";
       root.dataset.theme = next;
       try { localStorage.setItem("theme", next); } catch (e) { /* private mode */ }
     });

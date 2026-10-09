@@ -4,7 +4,7 @@ import io
 import random
 from datetime import timedelta
 
-from PIL import Image, ImageDraw, ImageFont
+from PIL import Image, ImageDraw, ImageFilter, ImageFont
 
 from app import images
 from app.db import SessionLocal, init_db
@@ -28,37 +28,77 @@ EVENTS = [
     ("Bachata Moonlight Social", ["Bachata"], "Social", "Open", "frei"),
     ("Kizomba Marathon", ["Kizomba"], "Festival", "Open", "45 €"),
 ]
-COLORS = [(214, 36, 110), (124, 58, 237), (13, 148, 136), (217, 119, 6), (30, 64, 175)]
+# Accent glow per flyer: wine, plum, smoky gold, midnight teal, ember
+COLORS = [(150, 18, 52), (96, 36, 120), (160, 120, 50), (24, 84, 90), (170, 60, 30)]
+GOLD = (201, 164, 92)
+SERIF_FONTS = [
+    "/usr/share/fonts/truetype/dejavu/DejaVuSerif.ttf",
+    "/usr/share/fonts/truetype/liberation/LiberationSerif-Italic.ttf",
+    "/usr/share/fonts/truetype/freefont/FreeSerif.ttf",
+    "/Library/Fonts/Georgia.ttf",
+    "C:/Windows/Fonts/georgia.ttf",
+]
+
+
+def _font(size: int, italic: bool = False):
+    paths = SERIF_FONTS[1:2] + SERIF_FONTS if italic else SERIF_FONTS
+    for path in paths:
+        try:
+            return ImageFont.truetype(path, size)
+        except OSError:
+            continue
+    try:
+        return ImageFont.load_default(size=size)
+    except TypeError:
+        return ImageFont.load_default()
 
 
 def make_flyer(title: str, when: str, where: str, color) -> bytes:
-    img = Image.new("RGB", (800, 1100), color)
-    draw = ImageDraw.Draw(img)
+    """A dark, candle-lit demo flyer: black base, blurred accent spotlight, thin gold frame, serif type."""
+    w, h = 800, 1100
+    img = Image.new("RGB", (w, h), (10, 7, 9))
+    glow = Image.new("RGB", (w, h), (10, 7, 9))
+    gd = ImageDraw.Draw(glow)
     rnd = random.Random(title)
-    for _ in range(30):
-        x, y, r = rnd.randint(0, 800), rnd.randint(0, 1100), rnd.randint(20, 160)
-        shade = tuple(min(255, c + rnd.randint(20, 80)) for c in color)
-        draw.ellipse([x - r, y - r, x + r, y + r], fill=shade)
-    try:
-        big, small = ImageFont.load_default(size=64), ImageFont.load_default(size=36)
-    except TypeError:
-        big = small = ImageFont.load_default()
-    y = 380
-    for word in title.split():
-        draw.text((60, y), word.upper(), fill="white", font=big)
-        y += 80
-    draw.text((60, y + 40), when, fill="white", font=small)
-    draw.text((60, y + 90), where, fill="white", font=small)
+    cx, cy = rnd.randint(250, 550), rnd.randint(250, 420)
+    gd.ellipse([cx - 360, cy - 300, cx + 360, cy + 300], fill=color)
+    gd.ellipse([w - 260, h - 300, w + 120, h + 80], fill=tuple(c // 2 for c in color))
+    img = Image.blend(img, glow.filter(ImageFilter.GaussianBlur(140)), 0.9)
+    draw = ImageDraw.Draw(img)
+    # a thin gold ring as a spotlight / moon motif
+    draw.ellipse([cx - 150, cy - 150, cx + 150, cy + 150], outline=tuple(c * 2 // 3 for c in GOLD), width=1)
+    draw.rectangle([28, 28, w - 28, h - 28], outline=GOLD, width=2)
+    draw.rectangle([40, 40, w - 40, h - 40], outline=tuple(c // 2 for c in GOLD), width=1)
+    small, mid = _font(30), _font(34, italic=True)
+    draw.text((w // 2, 110), "—  NIGHT  OF  DANCE  —", fill=GOLD, font=small, anchor="mm")
+    y = 620
+    for line in _wrap(title.upper(), 15):
+        draw.text((w // 2, y), line, fill=(240, 228, 214), font=_font(60), anchor="mm")
+        y += 76
+    draw.line([w // 2 - 80, y, w // 2 + 80, y], fill=GOLD, width=1)
+    draw.text((w // 2, y + 50), when, fill=GOLD, font=mid, anchor="mm")
+    draw.text((w // 2, y + 100), where, fill=(200, 188, 176), font=small, anchor="mm")
     buf = io.BytesIO()
-    img.save(buf, "JPEG", quality=85)
+    img.save(buf, "JPEG", quality=88)
     return buf.getvalue()
+
+
+def _wrap(text: str, width: int) -> list[str]:
+    lines, line = [], ""
+    for word in text.split():
+        if line and len(line) + 1 + len(word) > width:
+            lines.append(line)
+            line = word
+        else:
+            line = f"{line} {word}".strip()
+    return lines + [line] if line else lines
 
 
 def main() -> None:
     init_db()
     db = SessionLocal()
     if db.query(Event).count():
-        print("Datenbank enthält schon Events – nichts zu tun.")
+        print("Datenbank enthält schon Events – nichts zu tun. (Neu anlegen: Datenbank-Datei löschen.)")
         return
     organizer = User(phone="491700000001", name="Demo-Veranstalter", role="ORGANIZER")
     db.add(organizer)
