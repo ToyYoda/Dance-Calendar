@@ -63,7 +63,9 @@ class FakeCompletions:
 
 @pytest.fixture
 def fake_model(monkeypatch):
+    """OpenAI-compatible server (not Ollama)."""
     monkeypatch.setattr(settings, "ai_provider", "openai")
+    monkeypatch.setattr(settings, "ai_base_url", "http://llm.example:8000/v1")
 
     def install(*answers):
         completions = FakeCompletions(answers)
@@ -108,5 +110,86 @@ def test_unreachable_server(fake_model):
 
     install, key = fake_model
     install(APIConnectionError(request=SimpleNamespace(method="POST", url="http://localhost:11434/v1")))
+    with pytest.raises(AIError, match="nicht erreichbar"):
+        ai.extract(key)
+
+
+# --- Ollama native API ----------------------------------------------------------
+
+
+class FakeOllama:
+    def __init__(self, answers):
+        self.answers = list(answers)
+        self.payloads = []
+
+    def __call__(self, url, json=None, timeout=None):
+        assert url == "http://localhost:11434/api/chat"
+        self.payloads.append(json)
+        status, body = self.answers.pop(0)
+        return SimpleNamespace(status_code=status, text=str(body), json=lambda: body)
+
+
+@pytest.fixture
+def fake_ollama(monkeypatch):
+    import requests
+
+    monkeypatch.setattr(settings, "ai_provider", "openai")
+    monkeypatch.setattr(settings, "ai_base_url", "http://localhost:11434/v1")
+
+    def install(*answers):
+        fake = FakeOllama(answers)
+        monkeypatch.setattr(requests, "post", fake)
+        return fake
+
+    key, _, _ = images.store_image(flyer_bytes())
+    return install, key
+
+
+def _ok(content, reason="stop", thinking=""):
+    return 200, {"message": {"content": content, "thinking": thinking}, "done_reason": reason}
+
+
+def test_ollama_native_disables_thinking_and_uses_schema(fake_ollama):
+    install, key = fake_ollama
+    fake = install(_ok(json.dumps(FLAT)))
+    ex = ai.extract(key)
+    assert ex.values["city"] == "Kassel"
+    payload = fake.payloads[0]
+    assert payload["think"] is False and payload["stream"] is False
+    assert payload["format"]["type"] == "object"  # JSON schema, not just "json"
+    assert payload["messages"][0]["images"]
+    assert payload["options"]["num_predict"] == 3000
+
+
+def test_ollama_model_without_thinking_mode(fake_ollama):
+    install, key = fake_ollama
+    fake = install((400, '{"error":"model does not support thinking"}'), _ok(json.dumps(FLAT)))
+    assert ai.extract(key).values["title"] == "Dolce Vita"
+    assert "think" not in fake.payloads[1]
+
+
+def test_ollama_truncation_explains_thinking(fake_ollama):
+    install, key = fake_ollama
+    install(_ok('{"title": "Dol', "length", thinking="Hmm " * 500), _ok('{"title"', "length", thinking="x" * 10))
+    with pytest.raises(AIError, match="nachgedacht"):
+        ai.extract(key)
+
+
+def test_ollama_falls_back_to_plain_json(fake_ollama):
+    install, key = fake_ollama
+    fake = install(_ok("Ich sehe einen Flyer."), _ok(json.dumps(FLAT)))
+    assert ai.extract(key).values["title"] == "Dolce Vita"
+    assert fake.payloads[1]["format"] == "json"
+
+
+def test_ollama_unreachable(fake_ollama, monkeypatch):
+    import requests
+
+    _, key = fake_ollama
+
+    def down(*a, **kw):
+        raise requests.ConnectionError("connection refused")
+
+    monkeypatch.setattr(requests, "post", down)
     with pytest.raises(AIError, match="nicht erreichbar"):
         ai.extract(key)

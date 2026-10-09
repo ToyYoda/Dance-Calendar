@@ -107,8 +107,71 @@ def _parse_json(text: str, expect: tuple[str, ...] = ()) -> dict:
     raise AIError(f"Antwort des Modells ist kein gültiges JSON. Anfang der Antwort: «{snippet}»")
 
 
+def _ollama_root() -> str | None:
+    """Base URL of Ollama's native API if AI_BASE_URL points to an Ollama server, else None."""
+    from urllib.parse import urlparse
+
+    url = settings.ai_base_url.rstrip("/")
+    host = urlparse(url).netloc
+    if settings.ai_provider == "ollama" or host.endswith(":11434") or "ollama" in host:
+        return url.removesuffix("/v1")
+    return None
+
+
 def _ask(model: str, prompt: str, key: str, max_side: int, max_tokens: int,
          schema: dict | None = None, expect: tuple[str, ...] = ()) -> dict:
+    root = _ollama_root()
+    if root:
+        return _ask_ollama(root, model, prompt, key, max_side, max_tokens, schema, expect)
+    return _ask_openai(model, prompt, key, max_side, max_tokens, schema, expect)
+
+
+def _ask_ollama(root: str, model: str, prompt: str, key: str, max_side: int, max_tokens: int,
+                schema: dict | None, expect: tuple[str, ...]) -> dict:
+    """Ollama's native /api/chat: reliable 'think: false' and schema-constrained output."""
+    import requests
+
+    image = base64.b64encode(images.to_jpeg_bytes(key, max_side)).decode()
+    base = {
+        "model": model,
+        "messages": [{"role": "user", "content": prompt, "images": [image]}],
+        "stream": False,
+        "think": False,  # reasoning models would otherwise spend the token budget on thinking
+        "options": {"temperature": 0, "num_predict": max_tokens},
+    }
+    last_error: AIError | None = None
+    for fmt in ([schema] if schema else []) + ["json"]:
+        payload = {**base, "format": fmt}
+        try:
+            resp = requests.post(f"{root}/api/chat", json=payload, timeout=settings.ai_timeout)
+            if resp.status_code == 400 and "think" in resp.text.lower():
+                payload.pop("think")  # model without a thinking mode
+                resp = requests.post(f"{root}/api/chat", json=payload, timeout=settings.ai_timeout)
+        except requests.RequestException as exc:
+            raise AIError(f"KI-Modell nicht erreichbar: {exc}") from exc
+        if resp.status_code != 200:
+            last_error = AIError(f"Ollama-Fehler {resp.status_code}: {resp.text[:300]}")
+            continue
+        data = resp.json()
+        message = data.get("message") or {}
+        content = message.get("content") or ""
+        try:
+            return _parse_json(content, expect)
+        except AIError as exc:
+            if data.get("done_reason") == "length":
+                thinking = message.get("thinking") or ""
+                why = (f"es hat {len(thinking)} Zeichen lang nachgedacht" if thinking
+                       else f"die Antwort war nach {len(content)} Zeichen noch nicht fertig")
+                last_error = AIError(f"Die Antwort des Modells wurde abgeschnitten ({why}). "
+                                     f"Ende der Antwort: «{' '.join(content.split())[-200:]}»")
+                log.warning("Abgeschnittene Modellantwort: %s", content[:2000])
+            else:
+                last_error = exc
+    raise last_error or AIError("KI-Anfrage fehlgeschlagen.")
+
+
+def _ask_openai(model: str, prompt: str, key: str, max_side: int, max_tokens: int,
+                schema: dict | None = None, expect: tuple[str, ...] = ()) -> dict:
     extra = {}
     if "api.openai.com" not in settings.ai_base_url:
         # Ollama: switch off the "thinking" phase of reasoning models; it costs time and tokens
@@ -139,7 +202,7 @@ def _ask(model: str, prompt: str, key: str, max_side: int, max_tokens: int,
         except AIError as exc:
             if choice.finish_reason == "length":
                 raise AIError("Die Antwort des Modells wurde abgeschnitten (Token-Limit). "
-                              "Ein größeres Modell oder AI_TIMEOUT erhöhen hilft meist.") from exc
+                              f"Ende der Antwort: «{' '.join((choice.message.content or '').split())[-200:]}»") from exc
             last_error = exc
     if isinstance(last_error, AIError):
         raise last_error
