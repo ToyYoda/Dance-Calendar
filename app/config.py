@@ -7,21 +7,32 @@ from pathlib import Path
 BASE_DIR = Path(__file__).resolve().parent.parent
 
 
-def _load_dotenv(path: Path) -> bool:
-    """Minimal .env support: KEY=VALUE lines; real environment variables win."""
+def _read_dotenv(path: Path) -> dict[str, str]:
+    """KEY=VALUE lines; when a key appears twice, the later line wins (like python-dotenv)."""
+    values: dict[str, str] = {}
     if not path.is_file():
-        return False
+        return values
     # utf-8-sig: Windows editors like to put a byte-order mark in front of the first key
     for line in path.read_text(encoding="utf-8-sig").splitlines():
         line = line.strip()
         if not line or line.startswith("#") or "=" not in line:
             continue
         key, value = line.split("=", 1)
-        os.environ.setdefault(key.strip(), value.split(" #", 1)[0].strip().strip('"').strip("'"))
+        values[key.strip()] = value.split(" #", 1)[0].strip().strip('"').strip("'")
+    return values
+
+
+def _load_dotenv(path: Path) -> bool:
+    """Real environment variables win over .env, so they can still override it."""
+    if not path.is_file():
+        return False
+    for key, value in _read_dotenv(path).items():
+        os.environ.setdefault(key, value)
     return True
 
 
 DOTENV_PATH = BASE_DIR / ".env"
+SYSTEM_ENV_KEYS = set(os.environ)  # set before .env is applied
 DOTENV_LOADED = _load_dotenv(DOTENV_PATH)
 
 

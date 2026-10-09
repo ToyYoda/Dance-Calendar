@@ -6,7 +6,7 @@ import sys
 import time
 from pathlib import Path
 
-from app.config import BASE_DIR, DOTENV_LOADED, DOTENV_PATH, settings
+from app.config import BASE_DIR, DOTENV_LOADED, DOTENV_PATH, SYSTEM_ENV_KEYS, _read_dotenv, settings
 
 
 def line(ok: bool | None, text: str) -> None:
@@ -26,8 +26,14 @@ def main() -> int:
         else:
             line(None, "Lege sie an mit:  copy .env.example .env")
 
-    if "AI_PROVIDER" in os.environ and DOTENV_LOADED:
-        line(None, f"AI_PROVIDER = {os.environ['AI_PROVIDER']!r}")
+    if "AI_PROVIDER" in SYSTEM_ENV_KEYS:
+        line(False, f"AI_PROVIDER ist als Windows-/System-Umgebungsvariable gesetzt ({os.environ['AI_PROVIDER']!r}) "
+                    "und hat Vorrang vor der .env. Entfernen mit:  [Environment]::SetEnvironmentVariable('AI_PROVIDER', $null, 'User')"
+                    "  und PowerShell neu öffnen.")
+    elif DOTENV_LOADED:
+        lines = [ln.strip() for ln in DOTENV_PATH.read_text(encoding="utf-8-sig").splitlines()
+                 if ln.strip().startswith("AI_PROVIDER")]
+        line(None, f"AI_PROVIDER-Zeilen in .env: {lines or 'keine'} → gilt: {_read_dotenv(DOTENV_PATH).get('AI_PROVIDER', '–')!r}")
     line(None, f"KI-Modus: {settings.ai_provider}")
     if settings.ai_provider == "mock":
         line(False, "Testmodus aktiv – es kommen feste Beispieldaten. In .env: AI_PROVIDER=openai")
