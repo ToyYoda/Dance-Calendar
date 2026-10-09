@@ -1,13 +1,14 @@
 """Vision-model access: flyer triage (DC-11) and structured extraction (DC-12, DC-13).
 
 Uses the `openai` SDK against any OpenAI-compatible endpoint. The default is a local
-Ollama server (AI_BASE_URL=http://localhost:11434/v1, AI_MODEL=llama3.2-vision) so flyers
+Ollama server (AI_BASE_URL=http://localhost:11434/v1, AI_MODEL=qwen3.5:4b) so flyers
 never leave the server. AI_PROVIDER=mock returns canned results for development.
 """
 
 import base64
 import json
 import re
+import logging
 import time
 from dataclasses import dataclass, field
 from datetime import date, datetime, timedelta
@@ -18,6 +19,8 @@ from PIL import Image
 from app import images
 from app.config import settings
 from app.models import DANCE_STYLES, EVENT_TYPES, EXTRACTED_FIELDS, LEVELS
+
+log = logging.getLogger(__name__)
 
 CORE_FIELDS = ["title", "start", "location_name", "city", "dance_styles"]
 
@@ -62,42 +65,85 @@ def _image_part(key: str, max_side: int) -> dict:
 
 
 THINK_BLOCK = re.compile(r"<think>.*?(</think>|$)", re.S | re.I)
+TRAILING_COMMA = re.compile(r",\s*([}\]])")
+DOUBLE_COMMA = re.compile(r",(\s*,)+")
 
 
-def _parse_json(text: str) -> dict:
-    # reasoning models (Qwen 3.x, DeepSeek R1 …) may prepend their thoughts
-    text = THINK_BLOCK.sub("", text or "").strip()
-    if not text:
-        raise AIError("Das Modell hat keine Antwort geliefert (evtl. nur nachgedacht und das Token-Limit erreicht).")
-    try:
-        return json.loads(text)
-    except json.JSONDecodeError:
-        match = re.search(r"\{.*\}", text, re.S)
-        if match:
+def _candidates(text: str):
+    """Every JSON object embedded in text, longest first (models like to wrap JSON in prose or fences)."""
+    decoder = json.JSONDecoder()
+    found = []
+    repaired = DOUBLE_COMMA.sub(",", text.replace("“", '"').replace("”", '"'))
+    for variant in (text, TRAILING_COMMA.sub(r"\1", repaired)):
+        for i, ch in enumerate(variant):
+            if ch != "{":
+                continue
             try:
-                return json.loads(match.group(0))
+                obj, end = decoder.raw_decode(variant, i)
             except json.JSONDecodeError:
-                pass
-    raise AIError("Antwort des Modells ist kein gültiges JSON.")
+                continue
+            if isinstance(obj, dict):
+                found.append((end - i, obj))
+    return [obj for _, obj in sorted(found, key=lambda t: -t[0])]
 
 
-def _ask(model: str, prompt: str, key: str, max_side: int, max_tokens: int) -> dict:
+def _parse_json(text: str, expect: tuple[str, ...] = ()) -> dict:
+    # reasoning models (Qwen 3.x, DeepSeek R1 …) may prepend their thoughts
+    cleaned = THINK_BLOCK.sub("", text or "").strip()
+    if not cleaned:
+        raise AIError("Das Modell hat keine Antwort geliefert (evtl. nur nachgedacht und das Token-Limit erreicht).")
+    for obj in _candidates(cleaned):
+        # some models wrap the result: {"event": {...}} or {"data": {...}}
+        if expect and not any(k in obj for k in expect) and len(obj) == 1:
+            inner = next(iter(obj.values()))
+            if isinstance(inner, dict):
+                obj = inner
+        hits = [k for k in expect if k in obj]
+        # a bare {"title": 0.9, ...} is the confidence map, not the answer
+        if not expect or (hits and not all(isinstance(obj[k], (int, float)) for k in hits)):
+            return obj
+    log.warning("Unbrauchbare Modellantwort: %s", cleaned[:2000])
+    snippet = " ".join(cleaned.split())[:300]
+    raise AIError(f"Antwort des Modells ist kein gültiges JSON. Anfang der Antwort: «{snippet}»")
+
+
+def _ask(model: str, prompt: str, key: str, max_side: int, max_tokens: int,
+         schema: dict | None = None, expect: tuple[str, ...] = ()) -> dict:
     extra = {}
     if "api.openai.com" not in settings.ai_base_url:
         # Ollama: switch off the "thinking" phase of reasoning models; it costs time and tokens
         extra["extra_body"] = {"think": False}
-    try:
-        resp = _client().chat.completions.create(
-            model=model,
-            temperature=0,
-            max_tokens=max_tokens,
-            response_format={"type": "json_object"},
-            messages=[{"role": "user", "content": [{"type": "text", "text": prompt}, _image_part(key, max_side)]}],
-            **extra,
-        )
-    except Exception as exc:
-        raise AIError(f"KI-Modell nicht erreichbar: {exc}") from exc
-    return _parse_json(resp.choices[0].message.content)
+    messages = [{"role": "user", "content": [{"type": "text", "text": prompt}, _image_part(key, max_side)]}]
+    # A JSON schema makes Ollama (and OpenAI) constrain the output to exactly this structure.
+    formats = []
+    if schema:
+        formats.append({"type": "json_schema", "json_schema": {"name": "result", "schema": schema, "strict": True}})
+    formats.append({"type": "json_object"})
+    client = _client()
+    last_error = None
+    for fmt in formats:
+        try:
+            resp = client.chat.completions.create(
+                model=model, temperature=0, max_tokens=max_tokens, response_format=fmt, messages=messages, **extra,
+            )
+        except Exception as exc:
+            from openai import APIConnectionError, APITimeoutError
+
+            if isinstance(exc, (APIConnectionError, APITimeoutError)):
+                raise AIError(f"KI-Modell nicht erreichbar: {exc}") from exc
+            last_error = exc  # e.g. the server does not support json_schema: try the next format
+            continue
+        choice = resp.choices[0]
+        try:
+            return _parse_json(choice.message.content, expect)
+        except AIError as exc:
+            if choice.finish_reason == "length":
+                raise AIError("Die Antwort des Modells wurde abgeschnitten (Token-Limit). "
+                              "Ein größeres Modell oder AI_TIMEOUT erhöhen hilft meist.") from exc
+            last_error = exc
+    if isinstance(last_error, AIError):
+        raise last_error
+    raise AIError(f"KI-Anfrage fehlgeschlagen: {last_error}")
 
 
 # --- Triage ----------------------------------------------------------------
@@ -106,6 +152,18 @@ CLASSIFY_PROMPT = """Is this image a flyer or poster that announces a specific e
 (e.g. a dance party, workshop, festival or social) with at least a date or a venue?
 Photos of people, memes, screenshots of chats and private pictures are NOT flyers.
 Reply with JSON only: {"is_flyer": true|false, "confidence": 0.0-1.0, "reason": "<max 10 words>"}"""
+
+
+CLASSIFY_SCHEMA = {
+    "type": "object",
+    "properties": {
+        "is_flyer": {"type": "boolean"},
+        "confidence": {"type": "number"},
+        "reason": {"type": "string"},
+    },
+    "required": ["is_flyer", "confidence", "reason"],
+    "additionalProperties": False,
+}
 
 
 def prefilter(key: str) -> Classification | None:
@@ -131,7 +189,8 @@ def classify(key: str) -> Classification:
         if settings.ai_provider == "mock":
             result = Classification(True, 0.99, "Mock: als Flyer angenommen")
         else:
-            data = _ask(settings.ai_classifier_model or settings.ai_model, CLASSIFY_PROMPT, key, 448, 400)
+            data = _ask(settings.ai_classifier_model or settings.ai_model, CLASSIFY_PROMPT, key, 448, 400,
+                        schema=CLASSIFY_SCHEMA, expect=("is_flyer",))
             result = Classification(
                 bool(data.get("is_flyer")),
                 _clamp(data.get("confidence", 0.5)),
@@ -145,30 +204,46 @@ def classify(key: str) -> Classification:
 
 
 def extraction_prompt(today: date) -> str:
-    return f"""You read a dance event flyer and return its data as JSON. Today is {today.isoformat()}.
+    return f"""Read this dance event flyer and return its data as one JSON object. Today is {today.isoformat()}.
 
-Return exactly this object. Every field is {{"value": ..., "confidence": 0.0-1.0}}.
-Use "value": null when the information is not on the flyer. NEVER guess or invent values.
-If a date has no year, use the next occurrence on or after today.
+Rules:
+- Copy only what is printed on the flyer. Use null (or [] for dance_styles) when something is not on it. Never guess.
+- dates as "YYYY-MM-DDTHH:MM". If a date has no year, use the next occurrence on or after today.
+- dance_styles: any of {", ".join(DANCE_STYLES)}
+- event_type: one of {", ".join(EVENT_TYPES)} or null
+- level: one of {", ".join(LEVELS)} or null
+- address = street and house number only; postcode and city separately
+- price as written on the flyer, e.g. "10 € / AK 12 €"
+- description: short summary in German, max 400 characters, or null
+- confidence: for every field, how sure you are (0.0 to 1.0) that it is printed on the flyer and read correctly
 
-{{
-  "title":         {{"value": "event name"}},
-  "dance_styles":  {{"value": ["one or more of: {', '.join(DANCE_STYLES)}"]}},
-  "event_type":    {{"value": "one of: {', '.join(EVENT_TYPES)}"}},
-  "level":         {{"value": "one of: {', '.join(LEVELS)}"}},
-  "start":         {{"value": "YYYY-MM-DDTHH:MM"}},
-  "end":           {{"value": "YYYY-MM-DDTHH:MM"}},
-  "doors":         {{"value": "HH:MM (admission / Einlass)"}},
-  "location_name": {{"value": "venue name"}},
-  "address":       {{"value": "street and house number"}},
-  "postcode":      {{"value": "postal code"}},
-  "city":          {{"value": "city"}},
-  "price":         {{"value": "price as written, e.g. '10 € / AK 12 €'"}},
-  "ticket_url":    {{"value": "https://..."}},
-  "description":   {{"value": "short description in German, max 400 characters"}}
-}}
+Answer with JSON only, no other text:
+{{"title": ..., "dance_styles": [...], "event_type": ..., "level": ..., "start": ..., "end": ..., "doors": "HH:MM",
+ "location_name": ..., "address": ..., "postcode": ..., "city": ..., "price": ..., "ticket_url": ..., "description": ...,
+ "confidence": {{"title": 0.9, "start": 0.8, ...}}}}"""
 
-confidence is how sure you are that the value is printed on the flyer and read correctly."""
+
+def _nullable(schema: dict) -> dict:
+    return {"anyOf": [schema, {"type": "null"}]}
+
+
+EXTRACTION_SCHEMA = {
+    "type": "object",
+    "properties": {
+        **{name: _nullable({"type": "string"}) for name in EXTRACTED_FIELDS},
+        "dance_styles": {"type": "array", "items": {"type": "string", "enum": DANCE_STYLES}},
+        "event_type": _nullable({"type": "string", "enum": EVENT_TYPES}),
+        "level": _nullable({"type": "string", "enum": LEVELS}),
+        "confidence": {
+            "type": "object",
+            "properties": {name: {"type": "number"} for name in EXTRACTED_FIELDS},
+            "required": list(EXTRACTED_FIELDS),
+            "additionalProperties": False,
+        },
+    },
+    "required": [*EXTRACTED_FIELDS, "confidence"],
+    "additionalProperties": False,
+}
 
 
 def _clamp(v) -> float:
@@ -201,12 +276,13 @@ def _parse_dt(raw) -> datetime | None:
 def normalize_extraction(data: dict) -> Extraction:
     """Validate raw model output against our vocabularies; anything unusable becomes empty."""
     ex = Extraction()
+    confidences = data.get("confidence") if isinstance(data.get("confidence"), dict) else {}
     for name in EXTRACTED_FIELDS:
         item = data.get(name)
-        if isinstance(item, dict):
+        if isinstance(item, dict):  # {"value": ..., "confidence": ...}
             value, conf = item.get("value"), _clamp(item.get("confidence", 0.0))
-        else:
-            value, conf = item, 0.5
+        else:  # flat value, confidence in a separate object
+            value, conf = item, _clamp(confidences.get(name, 0.5))
         if value in ("", [], None) or (isinstance(value, str) and value.strip().lower() in ("null", "none", "n/a")):
             continue
 
@@ -264,4 +340,6 @@ def extract(key: str, today: date | None = None) -> Extraction:
         data = json.loads(json.dumps(MOCK_RESULT))
         data["start"]["value"] = f"{(today + timedelta(days=7)).isoformat()}T21:00"
         return normalize_extraction(data)
-    return normalize_extraction(_ask(settings.ai_model, extraction_prompt(today), key, 1280, 3000))
+    data = _ask(settings.ai_model, extraction_prompt(today), key, 1280, 3000,
+                schema=EXTRACTION_SCHEMA, expect=("title", "start", "location_name", "dance_styles"))
+    return normalize_extraction(data)
