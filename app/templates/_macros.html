@@ -1,0 +1,32 @@
+{% macro style_badges(styles) -%}
+  {%- for s in styles or [] %}<span class="badge badge-{{ STYLE_CLASSES.get(s, 'other') }}">{{ s }}</span>{% endfor -%}
+{%- endmacro %}
+
+{% macro status_badge(status) -%}
+  <span class="badge status-{{ status|lower }}">{{ STATUS_LABELS.get(status, status) }}</span>
+{%- endmacro %}
+
+{% macro event_row(ev, show_date=false) -%}
+<a class="event-row {% if ev.is_cancelled %}is-cancelled{% endif %}" href="/events/{{ ev.id }}">
+  {% if ev.media %}
+    <img class="thumb" src="{{ media_url(ev.media.original_path, 'thumb') }}" alt="" loading="lazy" width="56" height="56">
+  {% else %}
+    <span class="thumb thumb-empty" aria-hidden="true">♪</span>
+  {% endif %}
+  <span class="event-row-body">
+    <span class="event-row-title">
+      {% if ev.is_cancelled %}<span class="cancel-tag">ABGESAGT</span>{% endif %}
+      <span class="title-text">{{ ev.title }}</span>
+    </span>
+    <span class="event-row-meta">
+      {% if show_date %}{{ ev.start|date }} · {% endif %}{{ ev.start|time }}{% if ev.end %}–{{ ev.end|time }}{% endif %} Uhr
+      {% if ev.location_name or ev.city %} · {{ ev.location_name or '' }}{% if ev.city %}{{ ', ' if ev.location_name }}{{ ev.city }}{% endif %}{% endif %}
+    </span>
+    <span class="event-row-tags">{{ style_badges(ev.dance_styles) }}{% if ev.event_type %}<span class="badge badge-plain">{{ ev.event_type }}</span>{% endif %}</span>
+  </span>
+</a>
+{%- endmacro %}
+
+{% macro field_error(errors, name) -%}
+  {% if errors.get(name) %}<p class="field-error" role="alert">{{ errors[name] }}</p>{% endif %}
+{%- endmacro %}

@@ -1,0 +1,59 @@
+<!doctype html>
+<html lang="de">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{% block title %}Dance Calendar{% endblock %} · Dance Calendar</title>
+  <meta name="description" content="Salsa, Bachata, Kizomba und mehr – alle Tanzevents in deiner Region.">
+  <script>
+    // Apply the saved theme before first paint to avoid a flash
+    try { var t = localStorage.getItem("theme"); if (t) document.documentElement.dataset.theme = t; } catch (e) {}
+  </script>
+  <link rel="icon" href="/static/favicon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="/static/style.css">
+  {% block head %}{% endblock %}
+</head>
+<body class="{% block body_class %}{% endblock %}">
+  <header class="topbar">
+    <a href="/" class="brand"><span class="brand-mark" aria-hidden="true">♪</span> Dance Calendar</a>
+    <nav class="topnav" aria-label="Hauptnavigation">
+      <a href="/" class="{% if request.url.path == '/' %}active{% endif %}">Kalender</a>
+      <a href="/events/new" class="{% if request.url.path.startswith('/events/new') %}active{% endif %}">Event eintragen</a>
+      {% if user %}
+        <a href="/me" class="{% if request.url.path.startswith('/me') %}active{% endif %}">Profil</a>
+      {% endif %}
+      {% if is_admin %}
+        <a href="/admin" class="{% if request.url.path.startswith('/admin') %}active{% endif %}">Admin</a>
+      {% endif %}
+    </nav>
+    <div class="topbar-actions">
+      <button type="button" class="icon-btn" id="theme-toggle" aria-label="Hell/Dunkel umschalten" title="Hell/Dunkel umschalten">
+        <span class="theme-icon-dark" aria-hidden="true">☾</span><span class="theme-icon-light" aria-hidden="true">☀</span>
+      </button>
+      {% if user %}
+        <form method="post" action="/logout"><button class="btn btn-ghost btn-sm">Abmelden</button></form>
+      {% else %}
+        <a class="btn btn-primary btn-sm" href="/login?next={{ request.url.path|urlencode }}">Anmelden</a>
+      {% endif %}
+    </div>
+  </header>
+
+  {% if flash %}<div class="flash" role="status">{{ flash }}</div>{% endif %}
+
+  <main class="container {% block main_class %}{% endblock %}">
+    {% block content %}{% endblock %}
+  </main>
+
+  <nav class="bottomnav" aria-label="Navigation">
+    <a href="/" class="{% if request.url.path == '/' %}active{% endif %}"><span aria-hidden="true">▦</span>Kalender</a>
+    <a href="/events/new" class="{% if request.url.path.startswith('/events/new') %}active{% endif %}"><span aria-hidden="true">＋</span>Eintragen</a>
+    {% if is_admin %}
+      <a href="/admin" class="{% if request.url.path.startswith('/admin') %}active{% endif %}"><span aria-hidden="true">✓</span>Admin</a>
+    {% endif %}
+    <a href="{{ '/me' if user else '/login' }}" class="{% if request.url.path.startswith('/me') %}active{% endif %}"><span aria-hidden="true">◉</span>{{ 'Profil' if user else 'Login' }}</a>
+  </nav>
+
+  <script src="/static/app.js" defer></script>
+  {% block scripts %}{% endblock %}
+</body>
+</html>

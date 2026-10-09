@@ -1,0 +1,49 @@
+{% extends "base.html" %}
+{% import "_macros.html" as m %}
+{% block title %}Prüfliste{% endblock %}
+{% block main_class %}wide{% endblock %}
+{% block content %}
+{% include "admin/_nav.html" %}
+<div class="page-head">
+  <h1>{{ STATUS_LABELS[status] }} <span class="muted">({{ events|length }})</span></h1>
+  <form method="get" class="inline-form">
+    <select name="status" aria-label="Status">
+      {% for s in ["ADMIN_REVIEW", "LIVE", "DRAFT", "REJECTED", "CANCELLED"] %}<option value="{{ s }}" {% if s == status %}selected{% endif %}>{{ STATUS_LABELS[s] }}</option>{% endfor %}
+    </select>
+    <select name="source" aria-label="Quelle">
+      <option value="">Alle Quellen</option>
+      <option value="BOT" {% if source == "BOT" %}selected{% endif %}>WhatsApp-Bot</option>
+      <option value="FORM" {% if source == "FORM" %}selected{% endif %}>Formular</option>
+    </select>
+    <select name="sort" aria-label="Sortierung">
+      <option value="date" {% if sort == "date" %}selected{% endif %}>Eventdatum</option>
+      <option value="score" {% if sort == "score" %}selected{% endif %}>Score (unsicherste zuerst)</option>
+      <option value="new" {% if sort == "new" %}selected{% endif %}>Neueste Eingänge</option>
+    </select>
+    <button class="btn btn-secondary btn-sm">Anzeigen</button>
+  </form>
+</div>
+
+<div class="triage-list">
+  {% for ev in events %}
+    {% set low = low_fields(ev, threshold) %}
+    <a class="triage-item card" href="{{ '/admin/events/%d'|format(ev.id) if status == 'ADMIN_REVIEW' else '/events/%d'|format(ev.id) }}">
+      {% if ev.media %}<img src="{{ media_url(ev.media.original_path, 'thumb') }}" alt="" loading="lazy" class="triage-thumb">{% else %}<span class="triage-thumb thumb-empty">♪</span>{% endif %}
+      <div class="triage-data">
+        <strong>{{ ev.title or "(ohne Titel)" }}</strong>
+        <span class="muted small">{{ ev.start|date if ev.start else "Datum fehlt" }} {{ ev.start|time }} · {{ ev.location_name or "Ort fehlt" }}{% if ev.city %}, {{ ev.city }}{% endif %}</span>
+        <span>{{ m.style_badges(ev.dance_styles) }}</span>
+        {% if low %}<span class="small warn-text">Unsicher: {% for f in low %}{{ FIELD_LABELS.get(f, f) }}{{ ", " if not loop.last }}{% endfor %}</span>{% endif %}
+        {% if ev.address_candidates %}<span class="small warn-text">Adresse mehrdeutig ({{ ev.address_candidates|length }} Treffer)</span>{% endif %}
+      </div>
+      <div class="triage-side">
+        {% if ev.confidence is not none %}<span class="score {% if ev.confidence < threshold %}score-low{% endif %}">{{ (ev.confidence * 100)|round|int }} %</span>{% endif %}
+        <span class="badge badge-plain">{{ "Bot" if ev.source == "BOT" else "Formular" }}</span>
+        {% if ev.is_locked_for(admin.id) %}<span class="small">🔒 {{ ev.locked_by.display_name }}</span>{% endif %}
+      </div>
+    </a>
+  {% else %}
+    <div class="card center"><p class="muted">Nichts zu tun. 🎉</p></div>
+  {% endfor %}
+</div>
+{% endblock %}

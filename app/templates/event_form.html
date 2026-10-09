@@ -1,0 +1,45 @@
+{% extends "base.html" %}
+{% import "_macros.html" as m %}
+{% block title %}{{ "Event bearbeiten" if event else "Event eintragen" }}{% endblock %}
+{% block content %}
+<section class="card form-card">
+  <h1>{{ "Event bearbeiten" if event else "Event eintragen" }}</h1>
+  {% if not event %}
+    <p class="muted">Tipp: Du kannst Flyer auch einfach per WhatsApp an unseren Bot schicken.</p>
+  {% endif %}
+
+  {% if event and event.status == "ADMIN_REVIEW" and not is_admin %}
+    <div class="notice">Dieses Event wird gerade von einem Admin geprüft. Deine Änderungen werden gespeichert,
+      das Event erscheint aber erst nach der Freigabe.</div>
+  {% endif %}
+  {% if locked %}
+    <div class="notice notice-warn" role="alert">🔒 {{ event.locked_by.display_name if event.locked_by else "Jemand" }} bearbeitet dieses Event gerade
+      (bis {{ event.locked_until|localtime }} Uhr). Speichern ist erst danach möglich.</div>
+  {% endif %}
+  {% if errors.get('_form') %}<div class="notice notice-warn" role="alert">{{ errors['_form'] }}</div>{% endif %}
+
+  <form method="post" enctype="multipart/form-data" class="event-form" novalidate
+        action="{{ '/events/%d/edit'|format(event.id) if event else '/events/new' }}"
+        {% if event %}data-unlock="/events/{{ event.id }}/unlock"{% endif %}>
+    {% if event %}<input type="hidden" name="sequence" value="{{ event.sequence }}">{% endif %}
+
+    {% include "_event_fields.html" %}
+
+    <label class="field {% if errors.get('flyer') %}has-error{% endif %}">
+      <span>Flyer {% if event and event.media %}(ersetzt den aktuellen){% endif %}</span>
+      <input type="file" name="flyer" accept="image/*">
+      {{ m.field_error(errors, 'flyer') }}
+    </label>
+
+    <div class="actions sticky-actions">
+      {% if not event or event.status == "DRAFT" %}
+        <button class="btn btn-primary" name="action" value="submit" {% if locked %}disabled{% endif %}>Veröffentlichen</button>
+        <button class="btn btn-secondary" name="action" value="draft" data-skip-validation {% if locked %}disabled{% endif %}>Als Entwurf speichern</button>
+      {% else %}
+        <button class="btn btn-primary" name="action" value="save" {% if locked %}disabled{% endif %}>Speichern</button>
+      {% endif %}
+      <a class="btn btn-ghost" href="{{ '/events/%d'|format(event.id) if event else '/' }}">Abbrechen</a>
+    </div>
+  </form>
+</section>
+{% endblock %}

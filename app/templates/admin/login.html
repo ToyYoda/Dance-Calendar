@@ -1,0 +1,27 @@
+{% extends "base.html" %}
+{% block title %}Admin-Login{% endblock %}
+{% block content %}
+<section class="card narrow">
+  <h1>Admin-Login</h1>
+  {% if error %}<div class="notice notice-warn" role="alert">{{ error }}</div>{% endif %}
+  {% if confirm_token %}
+    <p>Mit diesem Link meldest du dich als Admin an. Er funktioniert nur einmal.</p>
+    <form method="post" action="/admin/login/{{ confirm_token }}">
+      <button class="btn btn-primary btn-block">Jetzt als Admin anmelden</button>
+    </form>
+  {% elif sent %}
+    <p>Wenn diese Nummer als Admin freigeschaltet ist, kommt gleich ein Login-Link per WhatsApp.
+      Er ist 15 Minuten gültig und nur einmal nutzbar.</p>
+    {% if dev_link %}<div class="notice">Entwicklungsmodus – <a href="{{ dev_link }}">Login-Link öffnen</a></div>{% endif %}
+  {% else %}
+    <p class="muted">Admins melden sich per Magic Link an. Nur freigeschaltete Nummern erhalten einen Link.</p>
+    <form method="post" action="/admin/login" class="stack">
+      <label class="field">
+        <span>Handynummer</span>
+        <input type="tel" name="phone" value="{{ phone or '' }}" autocomplete="tel" required autofocus>
+      </label>
+      <button class="btn btn-primary btn-block">Login-Link senden</button>
+    </form>
+  {% endif %}
+</section>
+{% endblock %}

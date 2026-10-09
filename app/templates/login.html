@@ -1,0 +1,34 @@
+{% extends "base.html" %}
+{% block title %}Anmelden{% endblock %}
+{% block content %}
+<section class="card narrow">
+  <h1>Anmelden</h1>
+  {% if step == "phone" %}
+    <p class="muted">Ohne Passwort: Wir schicken dir einen Code per WhatsApp. Neue Nummern bekommen automatisch ein Profil.</p>
+    {% if error %}<div class="notice notice-warn" role="alert">{{ error }}</div>{% endif %}
+    <form method="post" action="/login" class="stack">
+      <input type="hidden" name="next" value="{{ next }}">
+      <label class="field">
+        <span>Handynummer</span>
+        <input type="tel" name="phone" value="{{ phone or '' }}" placeholder="+49 170 1234567" autocomplete="tel" required autofocus>
+      </label>
+      <button class="btn btn-primary btn-block">Code per WhatsApp senden</button>
+    </form>
+  {% else %}
+    <p class="muted">Wir haben einen 6-stelligen Code an <strong>{{ phone|phone }}</strong> geschickt. Er ist 10 Minuten gültig.</p>
+    {% if dev_code %}<div class="notice">Entwicklungsmodus – dein Code: <strong class="mono">{{ dev_code }}</strong></div>{% endif %}
+    {% if error %}<div class="notice notice-warn" role="alert">{{ error }}</div>{% endif %}
+    <form method="post" action="/login/verify" class="stack">
+      <input type="hidden" name="phone" value="{{ phone }}">
+      <input type="hidden" name="next" value="{{ next }}">
+      <label class="field">
+        <span>Code</span>
+        <input name="code" inputmode="numeric" pattern="[0-9]{6}" maxlength="6" autocomplete="one-time-code" required autofocus class="code-input">
+      </label>
+      <button class="btn btn-primary btn-block">Anmelden</button>
+    </form>
+    <p class="small"><a href="/login?next={{ next|urlencode }}">Andere Nummer / neuen Code anfordern</a></p>
+  {% endif %}
+  <p class="small muted">Admin? <a href="/admin/login">Zum Admin-Login</a></p>
+</section>
+{% endblock %}

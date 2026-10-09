@@ -1,0 +1,53 @@
+{% extends "base.html" %}
+{% block title %}Galerie{% endblock %}
+{% block main_class %}wide{% endblock %}
+{% block content %}
+{% include "admin/_nav.html" %}
+<div class="page-head">
+  <h1>Galerie <span class="muted">– {{ STATUS_LABELS[status] }} ({{ events|length }})</span></h1>
+  <form method="get" class="inline-form">
+    <select name="status" aria-label="Status" onchange="this.form.submit()">
+      {% for s in ["ADMIN_REVIEW", "DRAFT", "LIVE", "REJECTED"] %}<option value="{{ s }}" {% if s == status %}selected{% endif %}>{{ STATUS_LABELS[s] }}</option>{% endfor %}
+    </select>
+  </form>
+</div>
+
+<form method="post" action="/admin/batch" id="batch-form" class="batch">
+  <div class="batch-bar card">
+    <label class="check"><input type="checkbox" id="select-all"> Alle</label>
+    <span class="muted"><strong id="selected-count">0</strong> ausgewählt</span>
+    <select name="action" id="batch-action" aria-label="Aktion" required>
+      <option value="">Aktion wählen …</option>
+      <option value="approve">Freigeben</option>
+      <option value="reject">Ablehnen</option>
+      <option value="not_event">Als „kein Event“ markieren (löschen)</option>
+      <option value="set_location">Ort zuweisen</option>
+      <option value="delete">Löschen</option>
+    </select>
+    <div class="location-fields" id="location-fields" hidden>
+      <input name="location_name" placeholder="Location" aria-label="Location">
+      <input name="address" placeholder="Straße" aria-label="Straße">
+      <input name="postcode" placeholder="PLZ" aria-label="PLZ" size="6">
+      <input name="city" placeholder="Stadt" aria-label="Stadt">
+    </div>
+    <button class="btn btn-primary">Ausführen</button>
+  </div>
+
+  <div class="gallery">
+    {% for ev in events %}
+      <label class="gallery-item">
+        <input type="checkbox" name="ids" value="{{ ev.id }}" class="gallery-check">
+        {% if ev.media %}<img src="{{ media_url(ev.media.original_path, 'thumb') }}" alt="" loading="lazy">{% else %}<span class="thumb-empty">♪</span>{% endif %}
+        <span class="gallery-caption">
+          <strong>{{ ev.title or "(ohne Titel)" }}</strong>
+          <span class="small muted">{{ ev.start|date if ev.start else "kein Datum" }} · {{ ev.city or "kein Ort" }}</span>
+          {% if ev.is_locked_for(user.id) %}<span class="small">🔒 {{ ev.locked_by.display_name }}</span>{% endif %}
+        </span>
+        <a class="small gallery-open" href="/admin/events/{{ ev.id }}">öffnen</a>
+      </label>
+    {% else %}
+      <p class="muted">Keine Events.</p>
+    {% endfor %}
+  </div>
+</form>
+{% endblock %}

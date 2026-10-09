@@ -1,0 +1,9 @@
+<nav class="subnav" aria-label="Admin">
+  <a href="/admin" class="{% if request.url.path == '/admin' %}active{% endif %}">Prüfliste{% if counts and counts.review %} <span class="count">{{ counts.review }}</span>{% endif %}</a>
+  <a href="/admin/swipe" class="{% if request.url.path == '/admin/swipe' %}active{% endif %}">Swipe</a>
+  <a href="/admin/gallery" class="{% if request.url.path == '/admin/gallery' %}active{% endif %}">Galerie</a>
+  <a href="/admin/spam" class="{% if request.url.path == '/admin/spam' %}active{% endif %}">Spam{% if counts and counts.spam %} <span class="count">{{ counts.spam }}</span>{% endif %}</a>
+  <a href="/admin/cancellations" class="{% if request.url.path == '/admin/cancellations' %}active{% endif %}">Absagen{% if counts and counts.cancellations %} <span class="count">{{ counts.cancellations }}</span>{% endif %}</a>
+  <a href="/admin/stats" class="{% if request.url.path == '/admin/stats' %}active{% endif %}">Monitoring</a>
+  <a href="/admin/bot" class="{% if request.url.path == '/admin/bot' %}active{% endif %}">Bot-Simulator</a>
+</nav>

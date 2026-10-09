@@ -1,0 +1,179 @@
+{% extends "base.html" %}
+{% import "_macros.html" as m %}
+{% block title %}Kalender{% endblock %}
+{% block head %}
+  {% if view == "map" %}
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" crossorigin="">
+  {% endif %}
+{% endblock %}
+{% block content %}
+<div class="page-head">
+  <h1>Tanzevents</h1>
+  <div class="segmented" role="tablist" aria-label="Ansicht">
+    {% for key, label in [("month", "Monat"), ("week", "Woche"), ("list", "Liste"), ("map", "Karte")] %}
+      <a role="tab" aria-selected="{{ 'true' if view == key else 'false' }}" class="{% if view == key %}active{% endif %}"
+         href="{{ link(view=key, date=anchor.isoformat() if key in ('month', 'week') else None) }}">{{ label }}</a>
+    {% endfor %}
+  </div>
+</div>
+
+{% if profiles %}
+<div class="chips" aria-label="Gespeicherte Filter">
+  <a class="chip {% if not filters.active and not active_profile %}active{% endif %}" href="/?view={{ view }}&all=1">Alle</a>
+  {% for p in profiles %}
+    <a class="chip {% if active_profile == p.id|string %}active{% endif %}" href="/?{{ p.query }}{{ '&' if p.query }}view={{ view }}&profile={{ p.id }}">
+      {% if p.is_default %}★ {% endif %}{{ p.name }}</a>
+  {% endfor %}
+</div>
+{% endif %}
+
+<details class="filters card" {% if filters.active %}open{% endif %}>
+  <summary>Filter &amp; Suche{% if filters.active %} <span class="badge badge-plain">aktiv</span>{% endif %}</summary>
+  <form method="get" action="/" class="filter-form" id="filter-form">
+    <input type="hidden" name="view" value="{{ view }}">
+    <label class="field grow">
+      <span>Suche</span>
+      <input type="search" name="q" value="{{ filters.q }}" placeholder="Titel, Location, Beschreibung …">
+    </label>
+    <fieldset class="field">
+      <legend>Tanzstil</legend>
+      <div class="checks">
+        {% for s in DANCE_STYLES %}
+          <label class="check"><input type="checkbox" name="style" value="{{ s }}" {% if s in filters.styles %}checked{% endif %}> {{ s }}</label>
+        {% endfor %}
+      </div>
+    </fieldset>
+    <fieldset class="field">
+      <legend>Event-Typ</legend>
+      <div class="checks">
+        {% for t in EVENT_TYPES %}
+          <label class="check"><input type="checkbox" name="type" value="{{ t }}" {% if t in filters.types %}checked{% endif %}> {{ t }}</label>
+        {% endfor %}
+      </div>
+    </fieldset>
+    <fieldset class="field">
+      <legend>Level</legend>
+      <div class="checks">
+        {% for lv in LEVELS %}
+          <label class="check"><input type="checkbox" name="level" value="{{ lv }}" {% if lv in filters.levels %}checked{% endif %}> {{ lv }}</label>
+        {% endfor %}
+      </div>
+    </fieldset>
+    <div class="field-row">
+      <label class="field">
+        <span>Stadt</span>
+        <input name="city" value="{{ filters.city }}" list="cities" autocomplete="off">
+        <datalist id="cities">{% for c in cities %}<option value="{{ c }}">{% endfor %}</datalist>
+      </label>
+      <label class="field"><span>Von</span><input type="date" name="from" value="{{ filters.date_from.isoformat() if filters.date_from }}"></label>
+      <label class="field"><span>Bis</span><input type="date" name="to" value="{{ filters.date_to.isoformat() if filters.date_to }}"></label>
+    </div>
+    <div class="actions">
+      <button class="btn btn-primary">Anwenden</button>
+      <a class="btn btn-ghost" href="/?view={{ view }}&all=1">Zurücksetzen</a>
+    </div>
+  </form>
+  <div class="filter-extras">
+    {% if user %}
+      <form method="post" action="/me/profiles" class="inline-form">
+        <input type="hidden" name="query" value="{{ filters.to_query() }}">
+        <input name="name" placeholder="Name für diesen Filter" required maxlength="60" aria-label="Name für diesen Filter">
+        <label class="check"><input type="checkbox" name="default" value="1"> als Standard</label>
+        <button class="btn btn-secondary btn-sm">Filter speichern</button>
+      </form>
+    {% else %}
+      <p class="muted small"><a href="/login?next=/">Melde dich an</a>, um Filter zu speichern.</p>
+    {% endif %}
+    <p class="small">
+      <a href="{{ feed_url }}" class="copy-link" data-copy="{{ settings.base_url }}{{ feed_url }}">📅 Diese Auswahl als Kalender abonnieren</a>
+      <span class="muted">– Link kopieren und in Google, Apple oder Outlook Kalender als Abo einfügen.</span>
+    </p>
+  </div>
+</details>
+
+{% if view == "month" %}
+  <section class="card calendar">
+    <div class="cal-head">
+      <a class="icon-btn" href="{{ link(view='month', date=prev_date.isoformat()) }}" aria-label="Vorheriger Monat">‹</a>
+      <h2>{{ month_label }}</h2>
+      <a class="icon-btn" href="{{ link(view='month', date=next_date.isoformat()) }}" aria-label="Nächster Monat">›</a>
+    </div>
+    <div class="month-grid" role="grid">
+      {% for wd in WEEKDAYS %}<div class="wd" role="columnheader">{{ wd }}</div>{% endfor %}
+      {% for week in weeks %}
+        {% for d in week %}
+          {% set evs = by_day.get(d, []) %}
+          <a role="gridcell"
+             href="{{ link(view='month', date=anchor.isoformat(), day=d.isoformat()) }}#day"
+             class="day {% if d.month != anchor.month %}other{% endif %} {% if d == today %}today{% endif %} {% if d == selected_day %}selected{% endif %} {% if evs %}has-events{% endif %}"
+             aria-label="{{ d|date(long=true) }}: {{ evs|length }} Events">
+            <span class="day-num">{{ d.day }}</span>
+            {% if evs %}
+              <span class="dots">
+                {% for ev in evs[:4] %}<span class="dot dot-{{ STYLE_CLASSES.get((ev.dance_styles or ['x'])[0], 'other') }} {% if ev.is_cancelled %}dot-cancelled{% endif %}"></span>{% endfor %}
+              </span>
+              <span class="day-titles">
+                {% for ev in evs[:2] %}<span class="{% if ev.is_cancelled %}strike{% endif %}">{{ ev.title }}</span>{% endfor %}
+                {% if evs|length > 2 %}<span class="muted">+{{ evs|length - 2 }}</span>{% endif %}
+              </span>
+            {% endif %}
+          </a>
+        {% endfor %}
+      {% endfor %}
+    </div>
+  </section>
+  {% if selected_day %}
+  <section id="day" class="day-list">
+    <h2>{{ selected_day|date(long=true) }}</h2>
+    {% for ev in day_events %}{{ m.event_row(ev) }}{% else %}<p class="muted">Keine Events an diesem Tag.</p>{% endfor %}
+  </section>
+  {% endif %}
+
+{% elif view == "week" %}
+  <section class="card">
+    <div class="cal-head">
+      <a class="icon-btn" href="{{ link(view='week', date=prev_date.isoformat()) }}" aria-label="Vorherige Woche">‹</a>
+      <h2>{{ week_label }}</h2>
+      <a class="icon-btn" href="{{ link(view='week', date=next_date.isoformat()) }}" aria-label="Nächste Woche">›</a>
+    </div>
+    <div class="week-grid">
+      {% for d in days %}
+        <div class="week-day {% if d == today %}today{% endif %}">
+          <h3>{{ d|date }}</h3>
+          {% for ev in by_day.get(d, []) %}
+            <a class="week-event {% if ev.is_cancelled %}is-cancelled{% endif %} style-{{ STYLE_CLASSES.get((ev.dance_styles or ['x'])[0], 'other') }}" href="/events/{{ ev.id }}">
+              <strong>{{ ev.start|time }}</strong>
+              <span class="title-text">{% if ev.is_cancelled %}ABGESAGT · {% endif %}{{ ev.title }}</span>
+              <span class="muted small">{{ ev.location_name or ev.city or '' }}</span>
+            </a>
+          {% else %}<p class="muted small">–</p>{% endfor %}
+        </div>
+      {% endfor %}
+    </div>
+  </section>
+
+{% elif view == "list" %}
+  <section class="list-view">
+    {% for day, evs in grouped %}
+      <h2 class="list-day">{{ day|date(long=true) }}</h2>
+      {% for ev in evs %}{{ m.event_row(ev) }}{% endfor %}
+    {% else %}
+      <div class="card center"><p class="muted">Keine kommenden Events für diese Auswahl.</p></div>
+    {% endfor %}
+  </section>
+
+{% elif view == "map" %}
+  <section class="card map-card">
+    <div id="map" class="map" aria-label="Karte der Events"></div>
+    <p class="muted small">{{ markers|length }} von {{ events|length }} Events haben Koordinaten. Dein Standort wird nicht abgefragt.</p>
+  </section>
+  <script id="markers" type="application/json">{{ markers|tojson }}</script>
+{% endif %}
+{% endblock %}
+
+{% block scripts %}
+  {% if view == "map" %}
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin=""></script>
+  <script src="/static/map.js" defer></script>
+  {% endif %}
+{% endblock %}

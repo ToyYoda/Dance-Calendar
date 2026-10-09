@@ -1,0 +1,51 @@
+{% extends "base.html" %}
+{% block title %}Monitoring{% endblock %}
+{% block main_class %}wide{% endblock %}
+{% macro pct(v) %}{{ "–" if v is none else ((v * 100)|round(1)) ~ " %" }}{% endmacro %}
+{% block content %}
+{% include "admin/_nav.html" %}
+<h1>Model-Monitoring</h1>
+
+<div class="stat-tiles">
+  <div class="card stat"><span class="stat-label">Automation Rate</span><span class="stat-value">{{ pct(stats.automation_rate) }}</span>
+    <span class="muted small">{{ stats.auto_published }} von {{ stats.bot_events }} Bot-Events automatisch live</span></div>
+  <div class="card stat"><span class="stat-label">In Prüfung</span><span class="stat-value">{{ stats.in_review }}</span>
+    <span class="muted small">{{ stats.approved }} freigegeben · {{ stats.rejected }} abgelehnt</span></div>
+  <div class="card stat"><span class="stat-label">Triage-Genauigkeit</span><span class="stat-value">{{ pct(stats.classifier_accuracy) }}</span>
+    <span class="muted small">Ziel &gt; 98 % · {{ stats.false_positives }} falsch-positiv, {{ stats.false_negatives }} falsch-negativ</span></div>
+  <div class="card stat"><span class="stat-label">Triage-Dauer</span>
+    <span class="stat-value">{{ "–" if stats.classifier_avg_ms is none else (stats.classifier_avg_ms|round|int) ~ " ms" }}</span>
+    <span class="muted small">Ziel &lt; 500 ms{% if stats.classifier_p95_ms %} · p95 {{ stats.classifier_p95_ms }} ms{% endif %}</span></div>
+  <div class="card stat"><span class="stat-label">Bilder</span><span class="stat-value">{{ stats.media_total }}</span>
+    <span class="muted small">{{ stats.spam }} Spam · {{ stats.failed }} Fehler</span></div>
+</div>
+
+<section class="card">
+  <h2>Fehlerquote pro Feld</h2>
+  <p class="muted small">Anteil der geprüften Bot-Events, bei denen ein Admin das Feld korrigieren musste.</p>
+  <div class="bars" role="table">
+    {% for row in stats.field_errors %}
+      <div class="bar-row" role="row">
+        <span class="bar-label" role="cell">{{ row.field }}</span>
+        <span class="bar-track" role="cell" aria-label="{{ pct(row.rate) }}"><span class="bar-fill" style="width: {{ [row.rate * 100, 100]|min }}%"></span></span>
+        <span class="bar-value" role="cell">{{ pct(row.rate) }} <span class="muted">({{ row.count }})</span></span>
+      </div>
+    {% endfor %}
+  </div>
+</section>
+
+<section class="card">
+  <h2>Schwellenwerte</h2>
+  <form method="post" action="/admin/settings" class="field-row">
+    <label class="field">
+      <span>Auto-Publish ab Gesamtscore über</span>
+      <input type="number" name="auto_publish_threshold" min="0" max="1" step="0.01" value="{{ auto_threshold }}">
+    </label>
+    <label class="field">
+      <span>Feld als unsicher markieren unter</span>
+      <input type="number" name="field_threshold" min="0" max="1" step="0.01" value="{{ field_threshold }}">
+    </label>
+    <div class="actions"><button class="btn btn-primary">Speichern</button></div>
+  </form>
+</section>
+{% endblock %}

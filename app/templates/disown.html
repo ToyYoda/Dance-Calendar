@@ -1,0 +1,15 @@
+{% extends "base.html" %}
+{% block title %}Nicht mein Event{% endblock %}
+{% block content %}
+<section class="card narrow">
+  <h1>Nicht dein Event?</h1>
+  <p>Das Event <strong>„{{ event.title or 'ohne Titel' }}“</strong> wurde aus einem Flyer angelegt, den du geschickt hast,
+    und dir als Veranstalter:in zugeordnet.</p>
+  <p class="muted">Wenn du das Event nicht veranstaltest, übergib es an die Admins. Es verschwindet dann aus deiner Übersicht
+    und du kannst es nicht mehr bearbeiten.</p>
+  <form method="post" class="actions">
+    <button class="btn btn-primary">Ja, an die Admins übergeben</button>
+    <a class="btn btn-ghost" href="/events/{{ event.id }}">Abbrechen</a>
+  </form>
+</section>
+{% endblock %}

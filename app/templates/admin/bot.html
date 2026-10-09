@@ -1,0 +1,48 @@
+{% extends "base.html" %}
+{% block title %}Bot-Simulator{% endblock %}
+{% block main_class %}wide{% endblock %}
+{% block content %}
+{% include "admin/_nav.html" %}
+<h1>WhatsApp-Bot-Simulator</h1>
+<p class="muted">Testet die Ingestion ohne echte WhatsApp-Anbindung. Bilder und Nachrichten laufen durch dieselbe Pipeline wie der Webhook
+  (Triage → Extraktion → Adresse → Routing). KI: <strong>{{ settings.ai_provider }}</strong>{% if settings.ai_provider != "mock" %} ({{ settings.ai_model }} @ {{ settings.ai_base_url }}){% endif %},
+  Messenger: <strong>{{ settings.messenger }}</strong>.</p>
+
+<div class="profile-grid">
+  <section class="card">
+    <h2>Flyer schicken</h2>
+    <form method="post" action="/admin/bot/image" enctype="multipart/form-data" class="stack">
+      <label class="field"><span>Absender-Nummer</span><input type="tel" name="phone" value="{{ admin.phone|phone }}" required></label>
+      <label class="field"><span>Bild</span><input type="file" name="image" accept="image/*" required></label>
+      <button class="btn btn-primary">Senden</button>
+    </form>
+  </section>
+  <section class="card">
+    <h2>Textnachricht schicken</h2>
+    <form method="post" action="/admin/bot/text" class="stack">
+      <label class="field"><span>Absender-Nummer</span><input type="tel" name="phone" value="{{ admin.phone|phone }}" required></label>
+      <label class="field"><span>Nachricht</span><textarea name="text" rows="3" required placeholder="z. B. Die Salsa Night am 14.11. fällt leider aus"></textarea></label>
+      <button class="btn btn-primary">Senden</button>
+    </form>
+  </section>
+</div>
+
+<section class="card">
+  <h2>Ausgehende Nachrichten</h2>
+  <table class="table">
+    <thead><tr><th>Zeit (UTC)</th><th>An</th><th>Nachricht</th><th></th></tr></thead>
+    <tbody>
+      {% for msg in messages %}
+        <tr>
+          <td class="nowrap">{{ msg.created_at.strftime("%d.%m. %H:%M:%S") }}</td>
+          <td class="nowrap">{{ msg.to_phone|phone }}</td>
+          <td class="pre">{{ msg.body }}</td>
+          <td>{{ "✓" if msg.ok else "✕ " ~ (msg.error or "") }}</td>
+        </tr>
+      {% else %}
+        <tr><td colspan="4" class="muted">Noch keine Nachrichten.</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</section>
+{% endblock %}

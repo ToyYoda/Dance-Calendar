@@ -1,0 +1,25 @@
+{% extends "base.html" %}
+{% block title %}Absagen prüfen{% endblock %}
+{% block content %}
+{% include "admin/_nav.html" %}
+<h1>Unklare Absagen <span class="muted">({{ reqs|length }})</span></h1>
+<p class="muted">Diese Absage-Nachrichten konnten keinem Event eindeutig zugeordnet werden.</p>
+{% for r in reqs %}
+  <section class="card">
+    <p><strong>{{ r.sender_phone|phone }}</strong> schrieb:</p>
+    <blockquote>{{ r.text }}</blockquote>
+    <form method="post" action="/admin/cancellations/{{ r.id }}" class="stack">
+      {% for eid in r.candidate_ids %}
+        {% set ev = events.get(eid) %}
+        {% if ev %}
+          <label class="check block"><input type="radio" name="event_id" value="{{ ev.id }}"> {{ ev.title }} – {{ ev.start|date }} {{ ev.start|time }}, {{ ev.location_name or ev.city or "" }}</label>
+        {% endif %}
+      {% endfor %}
+      <label class="check block"><input type="radio" name="event_id" value="" checked> Keines davon (verwerfen)</label>
+      <button class="btn btn-primary">Bestätigen</button>
+    </form>
+  </section>
+{% else %}
+  <div class="card center"><p class="muted">Keine offenen Absagen.</p></div>
+{% endfor %}
+{% endblock %}

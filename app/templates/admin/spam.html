@@ -1,0 +1,29 @@
+{% extends "base.html" %}
+{% block title %}Spam-Ordner{% endblock %}
+{% block main_class %}wide{% endblock %}
+{% block content %}
+{% include "admin/_nav.html" %}
+<div class="page-head">
+  <h1>Spam &amp; Fehler <span class="muted">({{ items|length }})</span></h1>
+</div>
+<p class="muted">Bilder, die die Triage als „kein Flyer“ eingestuft hat, und Bilder, bei denen die KI nicht erreichbar war.
+  „Doch ein Flyer“ startet die Extraktion und zählt im Monitoring als Fehlklassifikation.</p>
+<div class="gallery">
+  {% for m in items %}
+    <div class="gallery-item static">
+      <a href="{{ media_url(m.original_path, 'original') }}" target="_blank" rel="noopener"><img src="{{ media_url(m.original_path, 'thumb') }}" alt="" loading="lazy"></a>
+      <span class="gallery-caption">
+        <span class="badge {{ 'status-rejected' if m.status == 'FAILED' else 'badge-plain' }}">{{ "Fehler" if m.status == "FAILED" else "Spam" }}</span>
+        <span class="small">{{ m.sender_phone|phone if m.sender_phone else "" }}</span>
+        <span class="small muted">{{ m.error or m.classifier_reason or "" }}</span>
+      </span>
+      <div class="actions wrap">
+        <form method="post" action="/admin/media/{{ m.id }}/restore"><button class="btn btn-secondary btn-sm">{{ "Erneut versuchen" if m.status == "FAILED" else "Doch ein Flyer" }}</button></form>
+        <form method="post" action="/admin/media/{{ m.id }}/delete" data-confirm="Bild endgültig löschen?"><button class="btn btn-ghost btn-sm">Löschen</button></form>
+      </div>
+    </div>
+  {% else %}
+    <p class="muted">Der Spam-Ordner ist leer.</p>
+  {% endfor %}
+</div>
+{% endblock %}

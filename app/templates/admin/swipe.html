@@ -1,0 +1,24 @@
+{% extends "base.html" %}
+{% block title %}Swipe-Review{% endblock %}
+{% block body_class %}swipe-page{% endblock %}
+{% block content %}
+{% include "admin/_nav.html" %}
+<section class="swipe" id="swipe" aria-live="polite">
+  <div class="swipe-stage" id="swipe-stage">
+    <p class="muted center" id="swipe-empty" hidden>Keine Events in der Prüfliste. 🎉</p>
+  </div>
+  <p class="swipe-msg" id="swipe-msg" role="status"></p>
+  <div class="swipe-buttons">
+    <button type="button" class="btn btn-warn round" id="swipe-reject" aria-label="Ablehnen (nach links wischen)">✕</button>
+    <button type="button" class="btn btn-ghost round" id="swipe-undo" aria-label="Letzte Aktion rückgängig" disabled>↶</button>
+    <button type="button" class="btn btn-primary round" id="swipe-approve" aria-label="Freigeben (nach rechts wischen)">✓</button>
+  </div>
+  <p class="muted small center">Rechts wischen = freigeben · links = ablehnen · Flyer antippen = groß anzeigen (Pinch-Zoom) · „Bearbeiten“ öffnet alle Felder.</p>
+</section>
+
+<div class="zoom" id="zoom" hidden>
+  <button type="button" class="icon-btn zoom-close" id="zoom-close" aria-label="Schließen">✕</button>
+  <img id="zoom-img" alt="Flyer in voller Größe">
+</div>
+{% endblock %}
+{% block scripts %}<script src="/static/swipe.js" defer></script>{% endblock %}

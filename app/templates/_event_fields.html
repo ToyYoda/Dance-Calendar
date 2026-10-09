@@ -1,0 +1,106 @@
+{# Shared event fields. Optional context: conf (field confidences), low (low-confidence fields),
+   auto (auto-filled fields), verified (manually checked fields). #}
+{% import "_macros.html" as m %}
+{% set conf = conf or {} %}
+{% set low = low or [] %}
+{% set auto = auto or [] %}
+{% set verified = verified or [] %}
+
+{% macro hint(name) -%}
+  {% if name in verified %}<span class="hint hint-ok" title="Manuell geprüft">✓ geprüft</span>
+  {% elif name in low %}<span class="hint hint-low" title="Die KI ist unsicher">⚠ {{ (conf[name] * 100)|round|int }} %</span>
+  {% elif name in conf %}<span class="hint">{{ (conf[name] * 100)|round|int }} %</span>{% endif %}
+  {% if name in auto %}<span class="hint hint-auto" title="Automatisch aus OpenStreetMap ergänzt">auto ergänzt</span>{% endif %}
+{%- endmacro %}
+
+{% macro cls(name) -%}field {% if name in low %}is-low{% endif %} {% if errors.get(name) %}has-error{% endif %}{%- endmacro %}
+
+<label class="{{ cls('title') }}">
+  <span>Titel <abbr title="Pflichtfeld">*</abbr> {{ hint('title') }}</span>
+  <input name="title" value="{{ values.title or '' }}" maxlength="200" data-required>
+  {{ m.field_error(errors, 'title') }}
+</label>
+
+<fieldset class="{{ cls('dance_styles') }}" data-required-group>
+  <legend>Tanzstil <abbr title="Pflichtfeld">*</abbr> {{ hint('dance_styles') }}</legend>
+  <div class="checks">
+    {% for s in DANCE_STYLES %}
+      <label class="check"><input type="checkbox" name="dance_styles" value="{{ s }}" {% if s in (values.dance_styles or []) %}checked{% endif %}> {{ s }}</label>
+    {% endfor %}
+  </div>
+  {{ m.field_error(errors, 'dance_styles') }}
+</fieldset>
+
+<div class="field-row">
+  <label class="{{ cls('event_type') }}">
+    <span>Event-Typ {{ hint('event_type') }}</span>
+    <select name="event_type">
+      <option value="">–</option>
+      {% for t in EVENT_TYPES %}<option {% if values.event_type == t %}selected{% endif %}>{{ t }}</option>{% endfor %}
+    </select>
+  </label>
+  <label class="{{ cls('level') }}">
+    <span>Level {{ hint('level') }}</span>
+    <select name="level">
+      <option value="">–</option>
+      {% for lv in LEVELS %}<option {% if values.level == lv %}selected{% endif %}>{{ lv }}</option>{% endfor %}
+    </select>
+  </label>
+</div>
+
+<div class="field-row">
+  <label class="{{ cls('start') }}">
+    <span>Beginn <abbr title="Pflichtfeld">*</abbr> {{ hint('start') }}</span>
+    <input type="datetime-local" name="start" value="{{ values.start|dtinput }}" data-required>
+    {{ m.field_error(errors, 'start') }}
+  </label>
+  <label class="{{ cls('end') }}">
+    <span>Ende {{ hint('end') }}</span>
+    <input type="datetime-local" name="end" value="{{ values.end|dtinput }}">
+    {{ m.field_error(errors, 'end') }}
+  </label>
+  <label class="{{ cls('doors') }}">
+    <span>Einlass {{ hint('doors') }}</span>
+    <input type="time" name="doors" value="{{ values.doors or '' }}">
+  </label>
+</div>
+
+<label class="{{ cls('location_name') }}">
+  <span>Location <abbr title="Pflichtfeld">*</abbr> {{ hint('location_name') }}</span>
+  <input name="location_name" value="{{ values.location_name or '' }}" maxlength="200" data-required>
+  {{ m.field_error(errors, 'location_name') }}
+</label>
+<div class="field-row">
+  <label class="{{ cls('address') }} grow">
+    <span>Straße und Hausnummer <abbr title="Pflichtfeld">*</abbr> {{ hint('address') }}</span>
+    <input name="address" value="{{ values.address or '' }}" maxlength="255" data-required autocomplete="street-address">
+    {{ m.field_error(errors, 'address') }}
+  </label>
+  <label class="{{ cls('postcode') }}">
+    <span>PLZ {{ hint('postcode') }}</span>
+    <input name="postcode" value="{{ values.postcode or '' }}" maxlength="16" inputmode="numeric" autocomplete="postal-code">
+  </label>
+  <label class="{{ cls('city') }}">
+    <span>Stadt <abbr title="Pflichtfeld">*</abbr> {{ hint('city') }}</span>
+    <input name="city" value="{{ values.city or '' }}" maxlength="100" data-required autocomplete="address-level2">
+    {{ m.field_error(errors, 'city') }}
+  </label>
+</div>
+
+<div class="field-row">
+  <label class="{{ cls('price') }}">
+    <span>Preis {{ hint('price') }}</span>
+    <input name="price" value="{{ values.price or '' }}" maxlength="100" placeholder="z. B. 10 € / AK 12 €">
+  </label>
+  <label class="{{ cls('ticket_url') }} grow">
+    <span>Ticketlink {{ hint('ticket_url') }}</span>
+    <input type="url" name="ticket_url" value="{{ values.ticket_url or '' }}" maxlength="500" placeholder="https://">
+    {{ m.field_error(errors, 'ticket_url') }}
+  </label>
+</div>
+
+<label class="{{ cls('description') }}">
+  <span>Beschreibung {{ hint('description') }}</span>
+  <textarea name="description" rows="5" maxlength="4000">{{ values.description or '' }}</textarea>
+  {{ m.field_error(errors, 'description') }}
+</label>

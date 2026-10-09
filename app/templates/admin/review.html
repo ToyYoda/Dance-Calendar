@@ -1,0 +1,61 @@
+{% extends "base.html" %}
+{% import "_macros.html" as m %}
+{% block title %}Review: {{ event.title or "Event" }}{% endblock %}
+{% block main_class %}wide{% endblock %}
+{% block content %}
+{% include "admin/_nav.html" %}
+
+<div class="page-head">
+  <h1>{{ event.title or "(ohne Titel)" }}</h1>
+  <div class="inline-meta">
+    {{ m.status_badge(event.status) }}
+    <span class="badge badge-plain">{{ "WhatsApp-Bot" if event.source == "BOT" else "Formular" }}</span>
+    {% if event.confidence is not none %}<span class="score {% if event.confidence < threshold %}score-low{% endif %}">Score {{ (event.confidence * 100)|round|int }} %</span>{% endif %}
+    {% if event.submitter_phone %}<span class="muted small">von {{ event.submitter_phone|phone }}</span>{% endif %}
+  </div>
+</div>
+
+{% if locked %}
+  <div class="notice notice-warn" role="alert">🔒 {{ event.locked_by.display_name if event.locked_by else "Ein anderer Admin" }} bearbeitet dieses Event gerade (bis {{ event.locked_until|localtime }} Uhr). Du kannst es ansehen, aber nicht ändern.</div>
+{% endif %}
+{% if errors.get('_form') %}<div class="notice notice-warn" role="alert">{{ errors['_form'] }}</div>{% endif %}
+
+<div class="review-grid">
+  <aside class="review-flyer">
+    {% if event.media %}
+      <a href="{{ media_url(event.media.original_path, 'original') }}" target="_blank" rel="noopener" title="Original in voller Größe öffnen">
+        <img src="{{ media_url(event.media.original_path, 'preview') }}" alt="Flyer">
+      </a>
+      {% if event.media.classifier_reason %}<p class="muted small">Triage: {{ event.media.classifier_reason }} ({{ event.media.classifier_ms }} ms)</p>{% endif %}
+    {% else %}
+      <div class="thumb-empty big">Kein Flyer</div>
+    {% endif %}
+  </aside>
+
+  <form method="post" class="event-form review-form card" novalidate data-review data-unlock="/admin/events/{{ event.id }}/unlock">
+    {% if low %}<p class="notice small">Gelb markierte Felder hat die KI mit weniger als {{ (threshold * 100)|round|int }} % Sicherheit erkannt.</p>{% endif %}
+    {% set conf = event.field_confidence %}
+    {% set auto = event.auto_filled %}
+    {% set verified = event.verified_fields %}
+    {% include "_event_fields.html" %}
+
+    {% if event.address_candidates %}
+      <fieldset class="field is-low">
+        <legend>Adresse mehrdeutig – bitte auswählen</legend>
+        {% for c in event.address_candidates %}
+          <label class="check block"><input type="radio" name="candidate" value="{{ loop.index0 }}"> {{ c.label }}</label>
+        {% endfor %}
+        <label class="check block"><input type="radio" name="candidate" value="" checked> Keine davon (Adresse oben manuell eintragen)</label>
+      </fieldset>
+    {% endif %}
+
+    <div class="actions sticky-actions">
+      <button class="btn btn-primary" name="action" value="approve" {% if locked %}disabled{% endif %} title="Tastenkürzel: A">Freigeben <kbd>A</kbd></button>
+      <button class="btn btn-secondary" name="action" value="save" data-skip-validation {% if locked %}disabled{% endif %}>Speichern</button>
+      <button class="btn btn-warn" name="action" value="reject" data-skip-validation {% if locked %}disabled{% endif %} title="Tastenkürzel: R">Ablehnen <kbd>R</kbd></button>
+      <button class="btn btn-danger" name="action" value="delete" data-skip-validation data-confirm="Event endgültig löschen?" {% if locked %}disabled{% endif %} title="Tastenkürzel: D">Löschen <kbd>D</kbd></button>
+      {% if next_id %}<a class="btn btn-ghost" href="/admin/events/{{ next_id }}" data-next title="Tastenkürzel: N">Nächster <kbd>N</kbd></a>{% endif %}
+    </div>
+  </form>
+</div>
+{% endblock %}

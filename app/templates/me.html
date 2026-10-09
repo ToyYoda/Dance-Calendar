@@ -1,0 +1,94 @@
+{% extends "base.html" %}
+{% import "_macros.html" as m %}
+{% block title %}Profil{% endblock %}
+{% block content %}
+<div class="page-head">
+  <h1>Hallo{% if user.name %} {{ user.name }}{% endif %}!</h1>
+  <span class="muted">{{ user.phone|phone }} · {{ {"USER": "Tänzer:in", "ORGANIZER": "Veranstalter:in", "ADMIN": "Admin"}[user.role] }}</span>
+</div>
+
+<div class="profile-grid">
+  <section class="card">
+    <h2>Meine Zusagen</h2>
+    {% for ev in attending %}{{ m.event_row(ev, show_date=true) }}{% else %}
+      <p class="muted">Noch keine Zusagen. Tippe bei einem Event auf „Bin dabei“.</p>
+    {% endfor %}
+  </section>
+
+  <section class="card">
+    <h2>Meine Events</h2>
+    {% for ev in own_events %}
+      <div class="own-event">
+        {{ m.event_row(ev, show_date=true) if ev.start else '' }}
+        {% if not ev.start %}<a href="/events/{{ ev.id }}">{{ ev.title or "(ohne Titel)" }}</a>{% endif %}
+        <div class="own-event-meta">{{ m.status_badge(ev.status) }} <a class="small" href="/events/{{ ev.id }}/edit">Bearbeiten</a></div>
+      </div>
+    {% else %}
+      <p class="muted">Du hast noch keine Events eingetragen.</p>
+    {% endfor %}
+    <a class="btn btn-secondary" href="/events/new">Event eintragen</a>
+  </section>
+
+  <section class="card">
+    <h2>Gespeicherte Filter</h2>
+    {% for p in profiles %}
+      <div class="profile-row">
+        <a href="/?{{ p.query }}{{ '&' if p.query }}profile={{ p.id }}"><strong>{% if p.is_default %}★ {% endif %}{{ p.name }}</strong></a>
+        <span class="muted small">{{ describe(p.query) }}</span>
+        <div class="actions wrap">
+          <form method="post" action="/me/profiles/{{ p.id }}/rename" class="inline-form">
+            <input name="name" value="{{ p.name }}" maxlength="60" aria-label="Neuer Name">
+            <button class="btn btn-ghost btn-sm">Umbenennen</button>
+          </form>
+          <form method="post" action="/me/profiles/{{ p.id }}/default">
+            <button class="btn btn-ghost btn-sm">{{ "Kein Standard mehr" if p.is_default else "Als Standard" }}</button>
+          </form>
+          <form method="post" action="/me/profiles/{{ p.id }}/delete" data-confirm="Filter „{{ p.name }}“ löschen?">
+            <button class="btn btn-ghost btn-sm">Löschen</button>
+          </form>
+        </div>
+      </div>
+    {% else %}
+      <p class="muted">Im Kalender unter „Filter &amp; Suche“ kannst du Filter speichern. Der Standardfilter wird beim Öffnen automatisch angewendet.</p>
+    {% endfor %}
+  </section>
+
+  <section class="card" id="feeds">
+    <h2>Kalender-Abos</h2>
+    <p class="muted small">Füge diese Links in Google, Apple oder Outlook Kalender als Abo („Kalender per URL“) ein. Änderungen und Absagen werden automatisch übernommen.</p>
+    {% for f in feeds %}
+      <div class="feed-row">
+        <strong>{{ "Meine Zusagen" if f.kind == "attending" else "Filter: " ~ describe(f.query) }}</strong>
+        <div class="copy-field">
+          <input readonly value="{{ feed_base }}/feeds/{{ f.token }}.ics" aria-label="Feed-URL">
+          <button type="button" class="btn btn-secondary btn-sm" data-copy="{{ feed_base }}/feeds/{{ f.token }}.ics">Kopieren</button>
+        </div>
+        <form method="post" action="/me/feeds/{{ f.id }}/delete" data-confirm="Feed löschen? Abos mit diesem Link funktionieren dann nicht mehr.">
+          <button class="btn btn-ghost btn-sm">Löschen</button>
+        </form>
+      </div>
+    {% endfor %}
+    {% if not feeds|selectattr("kind", "equalto", "attending")|list %}
+      <form method="post" action="/me/feeds">
+        <input type="hidden" name="kind" value="attending">
+        <button class="btn btn-secondary">Feed für meine Zusagen erstellen</button>
+      </form>
+    {% endif %}
+    {% for p in profiles %}
+      <form method="post" action="/me/feeds" class="inline-form">
+        <input type="hidden" name="kind" value="filter">
+        <input type="hidden" name="query" value="{{ p.query }}">
+        <button class="btn btn-ghost btn-sm">Feed für Filter „{{ p.name }}“ erstellen</button>
+      </form>
+    {% endfor %}
+  </section>
+
+  <section class="card">
+    <h2>Name</h2>
+    <form method="post" action="/me/name" class="inline-form">
+      <input name="name" value="{{ user.name or '' }}" maxlength="80" placeholder="Wie sollen wir dich nennen?" aria-label="Name">
+      <button class="btn btn-secondary btn-sm">Speichern</button>
+    </form>
+  </section>
+</div>
+{% endblock %}

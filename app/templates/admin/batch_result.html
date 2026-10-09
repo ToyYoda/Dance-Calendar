@@ -1,0 +1,16 @@
+{% extends "base.html" %}
+{% block title %}Batch-Ergebnis{% endblock %}
+{% block content %}
+{% include "admin/_nav.html" %}
+<section class="card narrow">
+  <h1>Batch abgeschlossen</h1>
+  <p><strong>{{ done }}</strong> {{ "Event" if done == 1 else "Events" }} erfolgreich bearbeitet.</p>
+  {% if failed %}
+    <div class="notice notice-warn">
+      <p><strong>{{ failed|length }}</strong> fehlgeschlagen:</p>
+      <ul>{% for f in failed %}<li>{{ f }}</li>{% endfor %}</ul>
+    </div>
+  {% endif %}
+  <a class="btn btn-primary" href="/admin/gallery">Zurück zur Galerie</a>
+</section>
+{% endblock %}

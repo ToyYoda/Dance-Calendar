@@ -1,0 +1,98 @@
+{% extends "base.html" %}
+{% import "_macros.html" as m %}
+{% block title %}{{ event.title or "Event" }}{% endblock %}
+{% block content %}
+<article class="event-detail {% if event.is_cancelled %}is-cancelled{% endif %}">
+  {% if event.is_cancelled %}
+    <div class="cancel-banner" role="alert">ABGESAGT – dieses Event findet nicht statt.</div>
+  {% endif %}
+  {% if event.status not in ("LIVE", "CANCELLED") %}
+    <div class="notice">Status: {{ m.status_badge(event.status) }}
+      {% if event.status == "DRAFT" %} – nur du siehst diesen Entwurf. Sende ihn ab, um ihn zu veröffentlichen.{% endif %}
+      {% if event.status == "ADMIN_REVIEW" %} – ein Admin prüft dieses Event noch.{% endif %}
+    </div>
+  {% endif %}
+
+  <div class="detail-grid">
+    <div class="detail-main">
+      <div class="tags">{{ m.style_badges(event.dance_styles) }}
+        {% if event.event_type %}<span class="badge badge-plain">{{ event.event_type }}</span>{% endif %}
+        {% if event.level %}<span class="badge badge-plain">{{ event.level }}</span>{% endif %}
+      </div>
+      <h1 class="title-text">{{ event.title }}</h1>
+
+      <dl class="facts">
+        <div><dt>Wann</dt><dd>{{ event.start|date(long=true) }}<br>{{ event.start|time }}{% if event.end %} – {% if event.end.date() != event.start.date() %}{{ event.end|date }} {% endif %}{{ event.end|time }}{% endif %} Uhr</dd></div>
+        {% if event.doors %}<div><dt>Einlass</dt><dd>{{ event.doors }} Uhr</dd></div>{% endif %}
+        <div><dt>Wo</dt><dd>{{ event.location_name or "" }}{% if event.full_address %}<br>{{ event.full_address }}{% endif %}</dd></div>
+        {% if event.price %}<div><dt>Preis</dt><dd>{{ event.price }}</dd></div>{% endif %}
+      </dl>
+
+      <div class="actions wrap">
+        {% if event.status == "LIVE" %}
+          {% if user %}
+            <form method="post" action="/events/{{ event.id }}/attend" class="attend" data-event="{{ event.id }}">
+              <input type="hidden" name="attend" value="{{ '0' if attending else '1' }}">
+              <button class="btn {{ 'btn-secondary' if attending else 'btn-primary' }} attend-btn" aria-pressed="{{ 'true' if attending else 'false' }}">
+                {{ "✓ Ich bin dabei" if attending else "Bin dabei" }}
+              </button>
+            </form>
+          {% else %}
+            <a class="btn btn-primary" href="/login?next=/events/{{ event.id }}">Bin dabei</a>
+          {% endif %}
+        {% endif %}
+        <span class="attend-count" data-count-for="{{ event.id }}" aria-live="polite"><strong>{{ count }}</strong> {{ "Zusage" if count == 1 else "Zusagen" }}</span>
+      </div>
+
+      <div class="actions wrap">
+        <a class="btn btn-secondary" href="/events/{{ event.id }}.ics">📅 In meinen Kalender</a>
+        {% if event.ticket_url %}<a class="btn btn-secondary" href="{{ event.ticket_url }}" rel="noopener nofollow" target="_blank">🎟 Tickets</a>{% endif %}
+        {% if event.location_name or event.full_address %}
+          <a class="btn btn-secondary" href="{{ route_url(event) }}" target="_blank" rel="noopener">🧭 Route planen</a>
+        {% endif %}
+      </div>
+
+      {% if event.description %}
+        <section class="description"><h2>Beschreibung</h2><p>{{ event.description }}</p></section>
+      {% endif %}
+
+      {% if event.lat is not none and event.lng is not none %}
+        <section>
+          <h2>Anfahrt</h2>
+          <iframe class="static-map" title="Karte: {{ event.location_name or event.full_address }}" loading="lazy"
+                  src="{{ static_map_url(event.lat, event.lng) }}"></iframe>
+        </section>
+      {% endif %}
+
+      {% if can_edit %}
+        <section class="owner-tools card">
+          <h2>Verwalten</h2>
+          <div class="actions wrap">
+            <a class="btn btn-secondary" href="/events/{{ event.id }}/edit">Bearbeiten</a>
+            {% if is_admin and event.status == "ADMIN_REVIEW" %}<a class="btn btn-secondary" href="/admin/events/{{ event.id }}">Im Review öffnen</a>{% endif %}
+            {% if event.status == "LIVE" %}
+              <form method="post" action="/events/{{ event.id }}/cancel" data-confirm="Event wirklich absagen? Alle, die zugesagt haben, sehen die Absage.">
+                <button class="btn btn-warn">Absagen</button>
+              </form>
+            {% endif %}
+            <form method="post" action="/events/{{ event.id }}/delete" data-confirm="Event endgültig löschen?">
+              <button class="btn btn-danger">Löschen</button>
+            </form>
+            {% if user and event.owner_id == user.id and event.source == "BOT" %}
+              <a class="btn btn-ghost" href="/events/{{ event.id }}/disown">Nicht mein Event</a>
+            {% endif %}
+          </div>
+        </section>
+      {% endif %}
+    </div>
+
+    {% if event.media %}
+    <aside class="detail-flyer">
+      <a href="{{ media_url(event.media.original_path, 'original') }}" target="_blank" rel="noopener">
+        <img src="{{ media_url(event.media.original_path, 'preview') }}" alt="Flyer: {{ event.title }}">
+      </a>
+    </aside>
+    {% endif %}
+  </div>
+</article>
+{% endblock %}
