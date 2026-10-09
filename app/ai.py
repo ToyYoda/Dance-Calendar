@@ -61,8 +61,14 @@ def _image_part(key: str, max_side: int) -> dict:
     return {"type": "image_url", "image_url": {"url": f"data:image/jpeg;base64,{b64}"}}
 
 
+THINK_BLOCK = re.compile(r"<think>.*?(</think>|$)", re.S | re.I)
+
+
 def _parse_json(text: str) -> dict:
-    text = (text or "").strip()
+    # reasoning models (Qwen 3.x, DeepSeek R1 …) may prepend their thoughts
+    text = THINK_BLOCK.sub("", text or "").strip()
+    if not text:
+        raise AIError("Das Modell hat keine Antwort geliefert (evtl. nur nachgedacht und das Token-Limit erreicht).")
     try:
         return json.loads(text)
     except json.JSONDecodeError:
@@ -76,6 +82,10 @@ def _parse_json(text: str) -> dict:
 
 
 def _ask(model: str, prompt: str, key: str, max_side: int, max_tokens: int) -> dict:
+    extra = {}
+    if "api.openai.com" not in settings.ai_base_url:
+        # Ollama: switch off the "thinking" phase of reasoning models; it costs time and tokens
+        extra["extra_body"] = {"think": False}
     try:
         resp = _client().chat.completions.create(
             model=model,
@@ -83,6 +93,7 @@ def _ask(model: str, prompt: str, key: str, max_side: int, max_tokens: int) -> d
             max_tokens=max_tokens,
             response_format={"type": "json_object"},
             messages=[{"role": "user", "content": [{"type": "text", "text": prompt}, _image_part(key, max_side)]}],
+            **extra,
         )
     except Exception as exc:
         raise AIError(f"KI-Modell nicht erreichbar: {exc}") from exc
@@ -120,7 +131,7 @@ def classify(key: str) -> Classification:
         if settings.ai_provider == "mock":
             result = Classification(True, 0.99, "Mock: als Flyer angenommen")
         else:
-            data = _ask(settings.ai_classifier_model or settings.ai_model, CLASSIFY_PROMPT, key, 448, 60)
+            data = _ask(settings.ai_classifier_model or settings.ai_model, CLASSIFY_PROMPT, key, 448, 400)
             result = Classification(
                 bool(data.get("is_flyer")),
                 _clamp(data.get("confidence", 0.5)),
@@ -253,4 +264,4 @@ def extract(key: str, today: date | None = None) -> Extraction:
         data = json.loads(json.dumps(MOCK_RESULT))
         data["start"]["value"] = f"{(today + timedelta(days=7)).isoformat()}T21:00"
         return normalize_extraction(data)
-    return normalize_extraction(_ask(settings.ai_model, extraction_prompt(today), key, 1280, 900))
+    return normalize_extraction(_ask(settings.ai_model, extraction_prompt(today), key, 1280, 3000))

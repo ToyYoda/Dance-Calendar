@@ -103,6 +103,9 @@ def test_scan_ai_failure_still_offers_form(user_client, db, monkeypatch):
     def boom(key, today=None):
         raise ai.AIError("KI-Modell nicht erreichbar: connection refused")
 
+    from app.config import settings
+
+    monkeypatch.setattr(settings, "ai_provider", "openai")
     monkeypatch.setattr(ai, "extract", boom)
     r = _scan(user_client)
     assert r.status_code == 200
@@ -114,3 +117,14 @@ def test_scan_rejects_non_images(user_client, db):
     r = user_client.post("/events/new/scan", files={"flyer": ("x.txt", b"hello", "text/plain")})
     assert r.status_code == 400 and "kein lesbares Bild" in r.text
     assert db.query(Media).count() == 0
+
+
+def test_mock_mode_is_clearly_flagged(user_client):
+    assert "Testmodus" in _scan(user_client).text
+
+
+def test_thinking_output_is_ignored():
+    from app.ai import _parse_json
+
+    raw = '<think>Der Flyer zeigt {Dolce Vita} …</think>\n{"title": {"value": "Dolce Vita", "confidence": 0.9}}'
+    assert _parse_json(raw)["title"]["value"] == "Dolce Vita"

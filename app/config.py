@@ -7,19 +7,22 @@ from pathlib import Path
 BASE_DIR = Path(__file__).resolve().parent.parent
 
 
-def _load_dotenv(path: Path) -> None:
+def _load_dotenv(path: Path) -> bool:
     """Minimal .env support: KEY=VALUE lines; real environment variables win."""
     if not path.is_file():
-        return
-    for line in path.read_text(encoding="utf-8").splitlines():
+        return False
+    # utf-8-sig: Windows editors like to put a byte-order mark in front of the first key
+    for line in path.read_text(encoding="utf-8-sig").splitlines():
         line = line.strip()
         if not line or line.startswith("#") or "=" not in line:
             continue
         key, value = line.split("=", 1)
-        os.environ.setdefault(key.strip(), value.strip().strip('"').strip("'"))
+        os.environ.setdefault(key.strip(), value.split(" #", 1)[0].strip().strip('"').strip("'"))
+    return True
 
 
-_load_dotenv(BASE_DIR / ".env")
+DOTENV_PATH = BASE_DIR / ".env"
+DOTENV_LOADED = _load_dotenv(DOTENV_PATH)
 
 
 def _env(name: str, default: str = "") -> str:
@@ -49,7 +52,7 @@ class Settings:
     admin_phones: set[str] = field(default_factory=lambda: _phones(_env("ADMIN_PHONES")))
 
     # AI (DC-11, DC-12): any OpenAI-compatible endpoint; default is a local Ollama
-    ai_provider: str = field(default_factory=lambda: _env("AI_PROVIDER", "mock"))  # "openai" | "mock"
+    ai_provider: str = field(default_factory=lambda: _env("AI_PROVIDER", "mock").lower())  # "openai" | "mock"
     ai_base_url: str = field(default_factory=lambda: _env("AI_BASE_URL", "http://localhost:11434/v1"))
     ai_api_key: str = field(default_factory=lambda: _env("AI_API_KEY", "ollama"))
     ai_model: str = field(default_factory=lambda: _env("AI_MODEL", "llama3.2-vision"))

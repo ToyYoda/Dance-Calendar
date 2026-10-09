@@ -35,7 +35,11 @@
   {% if errors.get('_form') %}<div class="notice notice-warn" role="alert">{{ errors['_form'] }}</div>{% endif %}
 
   {% if scan_media %}
-    {% if scan_error %}
+    {% if ai_mock %}
+      <div class="notice notice-warn" role="alert"><strong>Testmodus:</strong> Es ist keine KI angebunden, deshalb stehen unten
+        feste Beispieldaten statt der Daten von deinem Flyer. In der Datei <code>.env</code> <code>AI_PROVIDER=openai</code> und
+        <code>AI_MODEL</code> setzen und den Server neu starten.</div>
+    {% elif scan_error %}
       <div class="notice notice-warn" role="alert">Der Flyer konnte nicht automatisch ausgelesen werden. Bitte fülle die Felder selbst aus.
         Der Flyer wird trotzdem an das Event gehängt.<br><span class="small muted">{{ scan_error }}</span></div>
     {% elif conf %}

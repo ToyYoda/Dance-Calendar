@@ -8,6 +8,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app import ai, images
+from app.config import settings
 from app.db import get_db
 from app.forms import apply_values, form_values, parse_event_form
 from app.ingestion import complete_address, locate_event, run_detached
@@ -87,7 +88,8 @@ async def scan_flyer(request: Request, db: Session = Depends(get_db), user: User
     except ai.AIError as exc:
         scan_error = str(exc)
     return render(request, "event_form.html", event=None, values=values, errors={},
-                  **_scan_context(db, media, conf, auto, scan_error=scan_error))
+                  **_scan_context(db, media, conf, auto, scan_error=scan_error,
+                                  ai_mock=settings.ai_provider == "mock"))
 
 
 def _claim_media(db: Session, user: User, raw_id) -> Media | None:

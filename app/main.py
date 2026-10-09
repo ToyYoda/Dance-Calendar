@@ -7,17 +7,27 @@ from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
 
+from app.config import settings
 from app.db import init_db
 from app.routers import admin, auth, me, organizer, public, webhooks
 from app.security import Forbidden, LoginRequired
 from app.web import redirect, render
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s")
+log = logging.getLogger("dance_calendar")
 
 
 @asynccontextmanager
 async def lifespan(_app: FastAPI):
     init_db()
+    from app.config import DOTENV_LOADED, DOTENV_PATH
+
+    log.info("Konfiguration: %s", DOTENV_PATH if DOTENV_LOADED else f"keine .env gefunden (erwartet: {DOTENV_PATH})")
+    if settings.ai_provider == "mock":
+        log.warning("KI: TESTMODUS (AI_PROVIDER=mock) – Flyer werden NICHT ausgelesen, es kommen feste Testdaten. "
+                    "Für Ollama in .env AI_PROVIDER=openai setzen und den Server neu starten.")
+    else:
+        log.info("KI: Modell %s über %s", settings.ai_model, settings.ai_base_url)
     yield
 
 
